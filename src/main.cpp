@@ -13,11 +13,15 @@
 
 /* Includes ------------------------------------------------------------------*/
 
+#include <Arduino.h>
 #include <Adafruit_PWMServoDriver.h>
-#include <FlexiTimer2.h>//to set a timer to manage all servos
+#include <BluetoothSerial.h>
+
 #include <SerialCommand.h>
 SerialCommand SCmd;   // The demo SerialCommand object
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+
+#define LED_BUILTIN  22
 
 /* Servos --------------------------------------------------------------------*/
 //define 12 servos for 4 legs
@@ -80,47 +84,9 @@ int RLFoot = 0;
 int RLElbow = 0; 
 int RLShdr=0;
 
-/*
-  - setup function
-   ---------------------------------------------------------------------------*/
-void setup()
-{
-  //start serial for debug
-  
-  Serial.begin(115200);
-  Serial.println("Robot starts initialization");
-  
-  pinMode(LED_BUILTIN, OUTPUT);
-  pwm.begin();
-  pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
-  SCmd.addCommand("w", action_cmd);
-
-  SCmd.setDefaultHandler(unrecognized);
-
-  //initialize default parameter
-  set_site(0, x_default - x_offset, y_start + y_step, z_boot);
-  set_site(1, x_default - x_offset, y_start + y_step, z_boot);
-  set_site(2, x_default + x_offset, y_start, z_boot);
-  set_site(3, x_default + x_offset, y_start, z_boot);
-  for (int i = 0; i < 4; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
-      site_now[i][j] = site_expect[i][j];
-    }
-  }
-  //start servo service
-  FlexiTimer2::set(20, servo_service);
-  FlexiTimer2::start();
-  Serial.println("Servo service started");
-  //initialize servos
- // servo_attach();
-  Serial.println("Servos initialized");
-  Serial.println("Robot initialization Complete");
-  sit();
-  b_init();
-}
-
+void set_site(int leg, float x, float y, float z);
+void wait_reach(int leg);
+void wait_all_reach(void);
 
 // you can use this function if you'd like to set the pulse length in seconds
 // e.g. setServoPulse(0, 0.001) is a ~1 millisecond pulse width. its not precise!
@@ -132,40 +98,6 @@ void setServoPulse(uint8_t n, double pulse) {
   pulse *= 1000000;  // convert to us
   pulse /= pulselength;
   pwm.setPWM(n, 0, pulse);
-}
-/*
-  - loop function
-   ---------------------------------------------------------------------------*/
-void loop()
-{
-  //-----------led blink status
-    if (ledPulse <= 500){
-      digitalWrite(LED_BUILTIN, LOW); 
-    }
-    if (ledPulse > 1000){
-      digitalWrite(LED_BUILTIN, HIGH); 
-    }
-    if (ledPulse >= 1500){
-      ledPulse = 0;
-    }
-    ledPulse++;
-  //-------------------
-    
-    SCmd.readSerial();
-    if (lastComm=="FWD"){
-      step_forward(1);
-    }
-    if (lastComm=="BWD"){
-      step_back(1);
-    }
-    if (lastComm=="LFT"){
-      turn_left(1);
-    }
-    if (lastComm=="RGT"){
-      turn_right(1);
-    }
-    Serial.println(lastComm);
-    // turn_right(1); //test
 }
 
 // w 0 2: body init
@@ -207,180 +139,6 @@ void loop()
 #define W_SET          15
 #define W_TW_R         16
 #define W_TW_L         17
-
-void action_cmd(void)
-{
-  char *arg;
-  int action_mode, n_step;
-  Serial.println("Action:");
-  arg = SCmd.next();
-  action_mode = atoi(arg);
-  arg = SCmd.next();
-  n_step = atoi(arg);
-  Demo_mode=false;
-
-  switch (action_mode)
-  {
-    case W_FORWARD:
-      Serial.println("Step forward");
-      lastComm="FWD";
-      if (!is_stand())
-        stand();
-        step_forward(n_step);
-      break;
-      
-    case W_BACKWARD:
-      Serial.println("Step back");
-      lastComm="BWD";
-      if (!is_stand())
-        stand();
-      step_back(n_step);
-      break;
-      
-    case W_LEFT:
-      Serial.println("Turn left");
-      lastComm="LFT";
-      if (!is_stand())
-        stand();
-      turn_left(n_step);
-      break;
-      
-    case W_RIGHT:
-      Serial.println("Turn right");
-      lastComm="RGT";
-      if (!is_stand())
-        stand();
-      turn_right(n_step);
-      break;
-      
-    case W_STAND_SIT:
-      Serial.println("1:up,0:dn");
-      lastComm="";
-      if (n_step)
-        stand();
-      else
-        sit();
-      break;
-      
-    case W_SHAKE:
-      Serial.println("Hand shake");
-      lastComm="";
-      hand_shake(n_step);
-      break;
-
-    case W_WAVE:
-      Serial.println("Hand wave");
-      lastComm="";
-      hand_wave(n_step);
-      break;
-
-    case W_DANCE:
-      Serial.println("Lets rock baby");
-      lastComm="";
-      //body_dance(n_step);
-      body_dance(10);
-      break;
-
-    case W_SET:
-      Serial.println("Higher");
-      FLElbow =0;FRElbow =0;
-      RLElbow =0;RRElbow =0;
-      FLFoot =0;FRFoot =0;
-      RLFoot =0;RRFoot =0;
-      FLShdr=0; FRShdr=0;
-      RLShdr=0;RRShdr=0;
-      stand();
-      break;  
-
-    case W_HIGHER:
-      Serial.println("Higher");
-      FLElbow -= 4;FRElbow -= 4;
-      RLElbow -= 4;RRElbow -= 4;
-      FLFoot += 4;FRFoot += 4;
-      RLFoot += 4;RRFoot += 4;
-      stand();
-      break;
-
-    case W_LOWER:
-      Serial.println("Lower");
-      FLElbow += 4;FRElbow += 4;
-      RLElbow += 4;RRElbow += 4;
-      FLFoot -= 4;FRFoot -= 4;
-      RLFoot -= 4;RRFoot -= 4;
-      stand();
-      break;
-
-    case W_HEAD_UP:
-      Serial.println("Head up");
-      FLElbow -= 4;FRElbow -= 4;
-      RLElbow += 4;RRElbow += 4;
-      FLFoot += 4;FRFoot += 4;
-      RLFoot -= 4;RRFoot -= 4;
-      stand();
-      break;
-
-    case W_HEAD_DOWN:
-      Serial.println("Head down");
-      FLElbow += 4;FRElbow += 4;
-      RLElbow -= 4;RRElbow -= 4;
-      FLFoot -= 4;FRFoot -= 4;
-      RLFoot += 4;RRFoot += 4;
-      stand();
-      break;
-
-    case W_B_RIGHT:
-      Serial.println("body right");
-      if (!is_stand()) stand();
-      FLElbow -= 4;FRElbow += 4;
-      RLElbow -= 4;RRElbow += 4;
-      FLFoot += 4;FRFoot -= 4;
-      RLFoot += 4;RRFoot -= 4;
-      stand();
-      break; 
-
-    case W_B_LEFT:
-      Serial.println("body left");
-      if (!is_stand()) stand();
-      FLElbow += 4;FRElbow -= 4;
-      RLElbow += 4;RRElbow -= 4;
-      FLFoot -= 4;FRFoot += 4;
-      RLFoot -= 4;RRFoot += 4;
-      stand();
-      break; 
-
-    case W_B_INIT:
-      Serial.println("Body init");
-      lastComm="";
-      sit();
-      b_init();
-      FLElbow =0;FRElbow =0;
-      RLElbow =0;RRElbow =0;
-      FLFoot =0;FRFoot =0;
-      RLFoot =0;RRFoot =0;
-      FLShdr=0; FRShdr=0;
-      RLShdr=0;RRShdr=0;
-      stand();
-      break;
-
-    case W_TW_R:
-      Serial.println("Body twist right");
-      FLShdr-= 4; FRShdr+= 4;
-      RLShdr+= 4;RRShdr-= 4;
-      stand();
-      break;
-      
-    case W_TW_L:
-      Serial.println("Body twist left");
-      FLShdr+= 4; FRShdr-= 4;
-      RLShdr-= 4;RRShdr+= 4;
-      stand();
-      break;
-
-    default:
-      Serial.println("Error");
-      break;
-  }
-}
 
 // This gets set as the default handler, and gets called when no other command matches.
 void unrecognized(const char *command) {
@@ -908,62 +666,25 @@ void body_dance(int i)
 }
 
 /*
-  - microservos service /timer interrupt function/50Hz
-  - when set site expected,this function move the end point to it in a straight line
-  - temp_speed[4][3] should be set before set expect site,it make sure the end point
-   move in a straight line,and decide move speed.
+  - trans site from cartesian to polar
+  - mathematical model 2/2
    ---------------------------------------------------------------------------*/
-void servo_service(void)
+void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile float &gamma, volatile float x, volatile float y, volatile float z)
 {
-  sei();
-  static float alpha, beta, gamma;
-
-  for (int i = 0; i < 4; i++)
-  {
-    for (int j = 0; j < 3; j++)
-    {
-      if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
-        site_now[i][j] += temp_speed[i][j];
-      else
-        site_now[i][j] = site_expect[i][j];
-    }
-
-    cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
-    polar_to_servo(i, alpha, beta, gamma);
-  }
-
-  rest_counter++;
+  //calculate w-z degree
+  float v, w;
+  w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
+  v = w - length_c;
+  alpha = atan2(z, v) + acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) / 2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
+  beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) / 2 / length_a / length_b);
+  //calculate x-y-z degree
+  gamma = (w >= 0) ? atan2(y, x) : atan2(-y, -x);
+  //trans degree pi->180
+  alpha = alpha / pi * 180;
+  beta = beta / pi * 180;
+  gamma = gamma / pi * 180;
 }
 
-/*
-  - set one of end points' expect site
-  - this founction will set temp_speed[4][3] at same time
-  - non - blocking function
-   ---------------------------------------------------------------------------*/
-void set_site(int leg, float x, float y, float z)
-{
-  float length_x = 0, length_y = 0, length_z = 0;
-
-  if (x != KEEP)
-    length_x = x - site_now[leg][0];
-  if (y != KEEP)
-    length_y = y - site_now[leg][1];
-  if (z != KEEP)
-    length_z = z - site_now[leg][2];
-
-  float length = sqrt(pow(length_x, 2) + pow(length_y, 2) + pow(length_z, 2));
-
-  temp_speed[leg][0] = length_x / length * move_speed * speed_multiple;
-  temp_speed[leg][1] = length_y / length * move_speed * speed_multiple;
-  temp_speed[leg][2] = length_z / length * move_speed * speed_multiple;
-
-  if (x != KEEP)
-    site_expect[leg][0] = x;
-  if (y != KEEP)
-    site_expect[leg][1] = y;
-  if (z != KEEP)
-    site_expect[leg][2] = z;
-}
 
 /*
   - wait one of end points move to expect site
@@ -988,25 +709,7 @@ void wait_all_reach(void)
     wait_reach(i);
 }
 
-/*
-  - trans site from cartesian to polar
-  - mathematical model 2/2
-   ---------------------------------------------------------------------------*/
-void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile float &gamma, volatile float x, volatile float y, volatile float z)
-{
-  //calculate w-z degree
-  float v, w;
-  w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
-  v = w - length_c;
-  alpha = atan2(z, v) + acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) / 2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
-  beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) / 2 / length_a / length_b);
-  //calculate x-y-z degree
-  gamma = (w >= 0) ? atan2(y, x) : atan2(-y, -x);
-  //trans degree pi->180
-  alpha = alpha / pi * 180;
-  beta = beta / pi * 180;
-  gamma = gamma / pi * 180;
-}
+
 
 /*
   - trans site from polar to microservos
@@ -1044,4 +747,313 @@ void polar_to_servo(int leg, float alpha, float beta, float gamma)
   int GA = ((580/180)*gamma);if (GA > 580) GA=580;if (GA < 125) GA=125;pwm.setPWM(servo_pin[leg][2],0,GA);
 }
 
+/*
+  - microservos service /timer interrupt function/50Hz
+  - when set site expected,this function move the end point to it in a straight line
+  - temp_speed[4][3] should be set before set expect site,it make sure the end point
+   move in a straight line,and decide move speed.
+   ---------------------------------------------------------------------------*/
+void servo_service(void)
+{
+  sei();
+  static float alpha, beta, gamma;
 
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
+        site_now[i][j] += temp_speed[i][j];
+      else
+        site_now[i][j] = site_expect[i][j];
+    }
+
+    cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
+    polar_to_servo(i, alpha, beta, gamma);
+  }
+
+  rest_counter++;
+}
+
+void action_cmd(void)
+{
+  char *arg;
+  int action_mode, n_step;
+  Serial.println("Action:");
+  arg = SCmd.next();
+  action_mode = atoi(arg);
+  arg = SCmd.next();
+  n_step = atoi(arg);
+  Demo_mode=false;
+
+  switch (action_mode)
+  {
+    case W_FORWARD:
+      Serial.println("Step forward");
+      lastComm="FWD";
+      if (!is_stand())
+        stand();
+        step_forward(n_step);
+      break;
+      
+    case W_BACKWARD:
+      Serial.println("Step back");
+      lastComm="BWD";
+      if (!is_stand())
+        stand();
+      step_back(n_step);
+      break;
+      
+    case W_LEFT:
+      Serial.println("Turn left");
+      lastComm="LFT";
+      if (!is_stand())
+        stand();
+      turn_left(n_step);
+      break;
+      
+    case W_RIGHT:
+      Serial.println("Turn right");
+      lastComm="RGT";
+      if (!is_stand())
+        stand();
+      turn_right(n_step);
+      break;
+      
+    case W_STAND_SIT:
+      Serial.println("1:up,0:dn");
+      lastComm="";
+      if (n_step)
+        stand();
+      else
+        sit();
+      break;
+      
+    case W_SHAKE:
+      Serial.println("Hand shake");
+      lastComm="";
+      hand_shake(n_step);
+      break;
+
+    case W_WAVE:
+      Serial.println("Hand wave");
+      lastComm="";
+      hand_wave(n_step);
+      break;
+
+    case W_DANCE:
+      Serial.println("Lets rock baby");
+      lastComm="";
+      //body_dance(n_step);
+      body_dance(10);
+      break;
+
+    case W_SET:
+      Serial.println("Higher");
+      FLElbow =0;FRElbow =0;
+      RLElbow =0;RRElbow =0;
+      FLFoot =0;FRFoot =0;
+      RLFoot =0;RRFoot =0;
+      FLShdr=0; FRShdr=0;
+      RLShdr=0;RRShdr=0;
+      stand();
+      break;  
+
+    case W_HIGHER:
+      Serial.println("Higher");
+      FLElbow -= 4;FRElbow -= 4;
+      RLElbow -= 4;RRElbow -= 4;
+      FLFoot += 4;FRFoot += 4;
+      RLFoot += 4;RRFoot += 4;
+      stand();
+      break;
+
+    case W_LOWER:
+      Serial.println("Lower");
+      FLElbow += 4;FRElbow += 4;
+      RLElbow += 4;RRElbow += 4;
+      FLFoot -= 4;FRFoot -= 4;
+      RLFoot -= 4;RRFoot -= 4;
+      stand();
+      break;
+
+    case W_HEAD_UP:
+      Serial.println("Head up");
+      FLElbow -= 4;FRElbow -= 4;
+      RLElbow += 4;RRElbow += 4;
+      FLFoot += 4;FRFoot += 4;
+      RLFoot -= 4;RRFoot -= 4;
+      stand();
+      break;
+
+    case W_HEAD_DOWN:
+      Serial.println("Head down");
+      FLElbow += 4;FRElbow += 4;
+      RLElbow -= 4;RRElbow -= 4;
+      FLFoot -= 4;FRFoot -= 4;
+      RLFoot += 4;RRFoot += 4;
+      stand();
+      break;
+
+    case W_B_RIGHT:
+      Serial.println("body right");
+      if (!is_stand()) stand();
+      FLElbow -= 4;FRElbow += 4;
+      RLElbow -= 4;RRElbow += 4;
+      FLFoot += 4;FRFoot -= 4;
+      RLFoot += 4;RRFoot -= 4;
+      stand();
+      break; 
+
+    case W_B_LEFT:
+      Serial.println("body left");
+      if (!is_stand()) stand();
+      FLElbow += 4;FRElbow -= 4;
+      RLElbow += 4;RRElbow -= 4;
+      FLFoot -= 4;FRFoot += 4;
+      RLFoot -= 4;RRFoot += 4;
+      stand();
+      break; 
+
+    case W_B_INIT:
+      Serial.println("Body init");
+      lastComm="";
+      sit();
+      b_init();
+      FLElbow =0;FRElbow =0;
+      RLElbow =0;RRElbow =0;
+      FLFoot =0;FRFoot =0;
+      RLFoot =0;RRFoot =0;
+      FLShdr=0; FRShdr=0;
+      RLShdr=0;RRShdr=0;
+      stand();
+      break;
+
+    case W_TW_R:
+      Serial.println("Body twist right");
+      FLShdr-= 4; FRShdr+= 4;
+      RLShdr+= 4;RRShdr-= 4;
+      stand();
+      break;
+      
+    case W_TW_L:
+      Serial.println("Body twist left");
+      FLShdr+= 4; FRShdr-= 4;
+      RLShdr-= 4;RRShdr+= 4;
+      stand();
+      break;
+
+    default:
+      Serial.println("Error");
+      break;
+  }
+}
+
+/*
+  - set one of end points' expect site
+  - this founction will set temp_speed[4][3] at same time
+  - non - blocking function
+   ---------------------------------------------------------------------------*/
+void set_site(int leg, float x, float y, float z)
+{
+  float length_x = 0, length_y = 0, length_z = 0;
+
+  if (x != KEEP)
+    length_x = x - site_now[leg][0];
+  if (y != KEEP)
+    length_y = y - site_now[leg][1];
+  if (z != KEEP)
+    length_z = z - site_now[leg][2];
+
+  float length = sqrt(pow(length_x, 2) + pow(length_y, 2) + pow(length_z, 2));
+
+  temp_speed[leg][0] = length_x / length * move_speed * speed_multiple;
+  temp_speed[leg][1] = length_y / length * move_speed * speed_multiple;
+  temp_speed[leg][2] = length_z / length * move_speed * speed_multiple;
+
+  if (x != KEEP)
+    site_expect[leg][0] = x;
+  if (y != KEEP)
+    site_expect[leg][1] = y;
+  if (z != KEEP)
+    site_expect[leg][2] = z;
+}
+
+/*
+  - setup function
+   ---------------------------------------------------------------------------*/
+void setup()
+{
+  //start serial for debug
+  
+  Serial.begin(115200);
+  Serial.println("Robot starts initialization");
+  
+  pinMode(LED_BUILTIN, OUTPUT);
+  pwm.begin();
+  pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
+  SCmd.addCommand("w", action_cmd);
+
+  SCmd.setDefaultHandler(unrecognized);
+
+  //initialize default parameter
+  set_site(0, x_default - x_offset, y_start + y_step, z_boot);
+  set_site(1, x_default - x_offset, y_start + y_step, z_boot);
+  set_site(2, x_default + x_offset, y_start, z_boot);
+  set_site(3, x_default + x_offset, y_start, z_boot);
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < 3; j++)
+    {
+      site_now[i][j] = site_expect[i][j];
+    }
+  }
+  //start servo service
+  // FlexiTimer2::set(20, servo_service);
+  // FlexiTimer2::start();
+  // Serial.println("Servo service started");
+  //initialize servos
+
+  servo_service();  // TODO: provisional initialization witout Timer
+  Serial.println("Servos initialized");
+  Serial.println("Robot initialization Complete");
+  sit();
+  b_init();
+}
+
+/*
+  - loop function
+   ---------------------------------------------------------------------------*/
+void loop()
+{
+  //-----------led blink status
+    if (ledPulse <= 500){
+      digitalWrite(LED_BUILTIN, LOW); 
+    }
+    if (ledPulse > 1000){
+      digitalWrite(LED_BUILTIN, HIGH); 
+    }
+    if (ledPulse >= 1500){
+      ledPulse = 0;
+    }
+    ledPulse++;
+  //-------------------
+    
+    SCmd.readSerial();
+    if (lastComm=="FWD"){
+      step_forward(1);
+    }
+    if (lastComm=="BWD"){
+      step_back(1);
+    }
+    if (lastComm=="LFT"){
+      turn_left(1);
+    }
+    if (lastComm=="RGT"){
+      turn_right(1);
+    }
+    Serial.println(lastComm);
+    // turn_right(1); //test
+    servo_service();
+    delay(100);
+}
