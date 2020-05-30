@@ -5,27 +5,11 @@
 
   - Remix Project by Wilmar
   - Date: 2018/09/25
-  - Change log: 
-      > Add more movement and combine demo and controlled move in one
-      > Using PCA9685 16 channel Servo controller for Arduino for motor driver
-      > Add NodeMCU for Wifi Controller as AP
-   -----------------------------------------------------------------------------
-  - Overview
-  - This project was written for the Crawling robot desigened by Sunfounder.
-    This version of the robot has 4 legs, and each leg is driven by 3 servos.
-  This robot is driven by a Ardunio Nano Board with an expansion Board.
-  We recommend that you view the product documentation before using.
-  - Request
-  - This project requires some library files, which you can find in the head of
-    this file. Make sure you have installed these files.
-  - How to
-  - Before use,you must to adjust the robot,in order to make it more accurate.
-    - Adjustment operation
-    1.uncomment ADJUST, make and run
-    2.comment ADJUST, uncomment VERIFY
-    3.measure real sites and set to real_site[4][3], make and run
-    4.comment VERIFY, make and run
-  The document describes in detail how to operate.
+  - ref: https://www.thingiverse.com/thing:3122758 
+
+  - Current version: Bluetooth Alternative with a ESP32
+  - Author: @hpsaturn
+  - source: https://github.com/hpsaturn/quadpod
 
 /* Includes ------------------------------------------------------------------*/
 
