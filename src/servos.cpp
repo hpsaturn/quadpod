@@ -2,6 +2,7 @@
 
 SerialCommand SCmd;  // The demo SerialCommand object
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+BluetoothSerial btSerial; //Object for Bluetooth
 
 /* Servos --------------------------------------------------------------------*/
 //define 12 servos for 4 legs
@@ -922,17 +923,22 @@ void servos_init() {
     // FlexiTimer2::set(20, servo_service);
     // FlexiTimer2::start();
     // Serial.println("Servo service started");
-    //initialize servos
 
+    btSerial.begin("QuadPod");
+    Serial.println("BT Serial ready");
+
+    //initialize servos
     servo_service();  // TODO: provisional initialization witout Timer
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
-    sit();
-    b_init();
+
+
+    // sit();
+    // b_init();
 }
 
 void commRead() {
-    SCmd.readSerial();
+    SCmd.readSerial(btSerial);
 }
 
 String getLastComm() {
@@ -953,7 +959,7 @@ void servos_loop() {
     if (getLastComm() == "RGT") {
         turn_right(1);
     }
-    Serial.println(getLastComm());
+    // Serial.println(getLastComm());
     // turn_right(1); //test
     servo_service();
     delay(100);

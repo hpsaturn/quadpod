@@ -1,5 +1,6 @@
 #include <Adafruit_PWMServoDriver.h>
 #include <SerialCommand.h>
+#include <BluetoothSerial.h>
 
 // w 0 2: body init
 // w 0 1: stand

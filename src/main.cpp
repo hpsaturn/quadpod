@@ -13,7 +13,6 @@
 --------------------------------------------------------------------------------*/
 
 #include <Arduino.h>
-#include <BluetoothSerial.h>
 #include <servos.hpp>
 
 #define LED_BUILTIN 22
