@@ -44,5 +44,4 @@
 
 void servos_init(void);
 void servos_loop(void);
-void wait_reach(int);
-void wait_all_reach(void);
+void servos_cmd(int action_mode, int n_step);

@@ -64,6 +64,27 @@ int RLFoot = 0;
 int RLElbow = 0;
 int RLShdr = 0;
 
+/*
+  - wait one of end points move to expect site
+  - blocking function
+   ---------------------------------------------------------------------------*/
+void wait_reach(int leg) {
+    while (1)
+        if (site_now[leg][0] == site_expect[leg][0])
+            if (site_now[leg][1] == site_expect[leg][1])
+                if (site_now[leg][2] == site_expect[leg][2])
+                    break;
+}
+
+/*
+  - wait all of end points move to expect site
+  - blocking function
+   ---------------------------------------------------------------------------*/
+void wait_all_reach(void) {
+    for (int i = 0; i < 4; i++)
+        wait_reach(i);
+}
+
 // you can use this function if you'd like to set the pulse length in seconds
 // e.g. setServoPulse(0, 0.001) is a ~1 millisecond pulse width. its not precise!
 void setServoPulse(uint8_t n, double pulse) {
@@ -599,27 +620,6 @@ void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile fl
 }
 
 /*
-  - wait one of end points move to expect site
-  - blocking function
-   ---------------------------------------------------------------------------*/
-void wait_reach(int leg) {
-    while (1)
-        if (site_now[leg][0] == site_expect[leg][0])
-            if (site_now[leg][1] == site_expect[leg][1])
-                if (site_now[leg][2] == site_expect[leg][2])
-                    break;
-}
-
-/*
-  - wait all of end points move to expect site
-  - blocking function
-   ---------------------------------------------------------------------------*/
-void wait_all_reach(void) {
-    for (int i = 0; i < 4; i++)
-        wait_reach(i);
-}
-
-/*
   - trans site from polar to microservos
   - mathematical model map to fact
   - the errors saved in eeprom will be add
@@ -690,14 +690,18 @@ void unrecognized(const char *command) {
     Serial.println("What?");
 }
 
-void action_cmd(void) {
+void action_cmd (void) {
     char *arg;
     int action_mode, n_step;
-    Serial.println("Action:");
     arg = SCmd.next();
     action_mode = atoi(arg);
     arg = SCmd.next();
     n_step = atoi(arg);
+    servos_cmd (action_mode, n_step);
+}
+
+void servos_cmd(int action_mode, int n_step) {
+    Serial.println("Action:");
     Demo_mode = false;
 
     switch (action_mode) {
@@ -902,11 +906,18 @@ void action_cmd(void) {
     }
 }
 
+void commRead() {
+    SCmd.readSerial(btSerial);
+}
+
+String getLastComm() {
+    return lastComm;
+}
+
 void servos_init() {
     pwm.begin();
     pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
     SCmd.addCommand("w", action_cmd);
-
     SCmd.setDefaultHandler(unrecognized);
 
     //initialize default parameter
@@ -932,17 +943,8 @@ void servos_init() {
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
 
-
     // sit();
     // b_init();
-}
-
-void commRead() {
-    SCmd.readSerial(btSerial);
-}
-
-String getLastComm() {
-    return lastComm;
 }
 
 void servos_loop() {
