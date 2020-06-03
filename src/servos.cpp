@@ -904,6 +904,7 @@ ESP32Timer ITimer0(0);
    move in a straight line,and decide move speed.
    ---------------------------------------------------------------------------*/
 void IRAM_ATTR servo_service(void) {
+    sei();
     static float alpha, beta, gamma;
 
     for (int i = 0; i < 4; i++) {
@@ -928,7 +929,10 @@ void IRAM_ATTR servo_service(void) {
 void servos_init() {
     Wire.begin(SDA_PIN,SCL_PIN);
     pwm.begin();
-    pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
+    pwm.setOscillatorFrequency(27000000);
+    pwm.setPWMFreq(50);  // Analog servos run at ~60 Hz updates
+    Serial.println("PMW Servo ready");
+
     SCmd.addCommand("w", action_cmd);
     SCmd.setDefaultHandler(unrecognized);
 
@@ -951,7 +955,7 @@ void servos_init() {
     Serial.println("BT Serial ready");
 
     // initialize servos
-    if (ITimer0.attachInterruptInterval(TIMER0_INTERVAL_MS * 500, servo_service))
+    if (ITimer0.attachInterruptInterval(TIMER0_INTERVAL_MS * 1000, servo_service))
         Serial.println("Starting  ITimer0 OK, millis() = " + String(millis()));
     else
         Serial.println("Can't set ITimer0. Select another freq. or timer");
@@ -959,8 +963,8 @@ void servos_init() {
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
 
-    sit();
-    b_init();
+    // sit();
+    // b_init();
 }
 
 void servos_loop() {
@@ -978,8 +982,7 @@ void servos_loop() {
         turn_right(1);
     }
     // Serial.println(getLastComm());
-    turn_right(1); //test
+    // turn_right(1); //test
     // servo_service();
-    delay(100);
 }
 
