@@ -4,6 +4,7 @@ SerialCommand SCmd;  // The demo SerialCommand object
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 BluetoothSerial btSerial; //Object for Bluetooth
 
+
 /* Servos --------------------------------------------------------------------*/
 //define 12 servos for 4 legs
 
@@ -660,30 +661,7 @@ void polar_to_servo(int leg, float alpha, float beta, float gamma) {
     pwm.setPWM(servo_pin[leg][2], 0, GA);
 }
 
-/*
-  - microservos service /timer interrupt function/50Hz
-  - when set site expected,this function move the end point to it in a straight line
-  - temp_speed[4][3] should be set before set expect site,it make sure the end point
-   move in a straight line,and decide move speed.
-   ---------------------------------------------------------------------------*/
-void servo_service(void) {
-    sei();
-    static float alpha, beta, gamma;
 
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 3; j++) {
-            if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
-                site_now[i][j] += temp_speed[i][j];
-            else
-                site_now[i][j] = site_expect[i][j];
-        }
-
-        cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
-        polar_to_servo(i, alpha, beta, gamma);
-    }
-
-    rest_counter++;
-}
 
 // This gets set as the default handler, and gets called when no other command matches.
 void unrecognized(const char *command) {
@@ -914,7 +892,41 @@ String getLastComm() {
     return lastComm;
 }
 
+#define TIMER0_INTERVAL_MS        1000
+
+// Init ESP32 timer 0
+ESP32Timer ITimer0(0);
+
+/*
+  - microservos service /timer interrupt function/50Hz
+  - when set site expected,this function move the end point to it in a straight line
+  - temp_speed[4][3] should be set before set expect site,it make sure the end point
+   move in a straight line,and decide move speed.
+   ---------------------------------------------------------------------------*/
+void IRAM_ATTR servo_service(void) {
+    static float alpha, beta, gamma;
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
+                site_now[i][j] += temp_speed[i][j];
+            else
+                site_now[i][j] = site_expect[i][j];
+        }
+
+        cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
+        polar_to_servo(i, alpha, beta, gamma);
+    }
+
+#if (TIMER_INTERRUPT_DEBUG > 0)
+    Serial.println("ITimer0: millis() = " + String(millis()));
+#endif
+
+  rest_counter++;
+}
+
 void servos_init() {
+    Wire.begin(SDA_PIN,SCL_PIN);
     pwm.begin();
     pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
     SCmd.addCommand("w", action_cmd);
@@ -938,13 +950,17 @@ void servos_init() {
     btSerial.begin("QuadPod");
     Serial.println("BT Serial ready");
 
-    //initialize servos
-    servo_service();  // TODO: provisional initialization witout Timer
+    // initialize servos
+    if (ITimer0.attachInterruptInterval(TIMER0_INTERVAL_MS * 500, servo_service))
+        Serial.println("Starting  ITimer0 OK, millis() = " + String(millis()));
+    else
+        Serial.println("Can't set ITimer0. Select another freq. or timer");
+
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
 
-    // sit();
-    // b_init();
+    sit();
+    b_init();
 }
 
 void servos_loop() {
@@ -962,8 +978,8 @@ void servos_loop() {
         turn_right(1);
     }
     // Serial.println(getLastComm());
-    // turn_right(1); //test
-    servo_service();
+    turn_right(1); //test
+    // servo_service();
     delay(100);
 }
 
