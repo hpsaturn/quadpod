@@ -14,7 +14,6 @@
 
 #include <Arduino.h>
 #include <servos.hpp>
-
 #define LED_BUILTIN 22
 
 int ledPulse = 0;
@@ -24,8 +23,11 @@ void setup() {
     Serial.begin(115200);
     Serial.println("Robot starts initialization");
     pinMode(LED_BUILTIN, OUTPUT);
+    delay(5000);
     servos_init();
 }
+
+uint16_t action;
 
 void loop() {
     //-----------led blink status
@@ -41,4 +43,9 @@ void loop() {
     ledPulse++;
     //-------------------
     servos_loop();
+
+    if(action++>10000) {
+        Serial.println("action 4 1");
+        servos_cmd(4,1);
+    }
 }

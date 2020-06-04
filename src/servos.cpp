@@ -626,7 +626,7 @@ void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile fl
   - mathematical model map to fact
   - the errors saved in eeprom will be add
    ---------------------------------------------------------------------------*/
-void polar_to_servo(volatile int leg, volatile float alpha, volatile float beta, volatile float gamma) {
+void polar_to_servo(int leg, float alpha, float beta, float gamma) {
     if (leg == 0)  //Front Right
     {
         alpha = 85 - alpha - FRElbow;  //elbow (- is up)
@@ -897,20 +897,19 @@ hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 uint32_t cp0_regs[18];
 
-
 void IRAM_ATTR servo_service(void) {
     sei();
     portENTER_CRITICAL_ISR(&timerMux);
 
     // get FPU state
     uint32_t cp_state = xthal_get_cpenable();
-  
-    if(cp_state) {
-    // Save FPU registers
-    xthal_save_cp0(cp0_regs);
+
+    if (cp_state) {
+        // Save FPU registers
+        xthal_save_cp0(cp0_regs);
     } else {
-    // enable FPU
-    xthal_set_cpenable(1);
+        // enable FPU
+        xthal_set_cpenable(1);
     }
 
     static float alpha, beta, gamma;
@@ -929,16 +928,16 @@ void IRAM_ATTR servo_service(void) {
 
     rest_counter++;
 
-    #if (TIMER_INTERRUPT_DEBUG > 0)
+#if (TIMER_INTERRUPT_DEBUG > 0)
     Serial.println("ITimer1: millis() = " + String(millis()));
-    #endif
+#endif
 
-    if(cp_state) {
-    // Restore FPU registers
-    xthal_restore_cp0(cp0_regs);
+    if (cp_state) {
+        // Restore FPU registers
+        xthal_restore_cp0(cp0_regs);
     } else {
-    // turn it back off
-    xthal_set_cpenable(0);
+        // turn it back off
+        xthal_set_cpenable(0);
     }
     portEXIT_CRITICAL_ISR(&timerMux);
 }
@@ -980,27 +979,27 @@ void servos_init() {
 	timerAlarmWrite(timer,20000, true);
 	timerAlarmEnable(timer);
 
+    sit();
+    b_init();
+
     //initialize servos
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
-
-    sit();
-    b_init();
 }
 
 
-#ifdef ENABLE_BLUETOOTH
 void commRead() {
+#ifdef ENABLE_BLUETOOTH
     SCmd.readSerial(btSerial);
-}
 #endif
+}
 
 String getLastComm() {
     return lastComm;
 }
 
 void servos_loop() {
-    // commRead();
+    commRead();
     if (getLastComm() == "FWD") {
         step_forward(1);
     }
@@ -1014,7 +1013,7 @@ void servos_loop() {
         turn_right(1);
     }
     // Serial.println(getLastComm());
-    turn_right(1); //test
-    delay(1000);
+    // turn_right(40); //test
+    // delay(1000);
 }
 
