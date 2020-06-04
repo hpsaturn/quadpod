@@ -1,6 +1,12 @@
 #include <Adafruit_PWMServoDriver.h>
+#ifdef ENABLE_BLUETOOTH
 #include <SerialCommand.h>
 #include <BluetoothSerial.h>
+#endif
+
+#define SDA_PIN 16
+#define SCL_PIN 4
+#define LED_PIN 22
 
 // w 0 2: body init
 // w 0 1: stand

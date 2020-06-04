@@ -1,8 +1,10 @@
 #include <servos.hpp>
 
+#ifdef ENABLE_BLUETOOTH
 SerialCommand SCmd;  // The demo SerialCommand object
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 BluetoothSerial btSerial; //Object for Bluetooth
+#endif
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
 /* Servos --------------------------------------------------------------------*/
 //define 12 servos for 4 legs
@@ -624,7 +626,7 @@ void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile fl
   - mathematical model map to fact
   - the errors saved in eeprom will be add
    ---------------------------------------------------------------------------*/
-void polar_to_servo(int leg, float alpha, float beta, float gamma) {
+void polar_to_servo(volatile int leg, volatile float alpha, volatile float beta, volatile float gamma) {
     if (leg == 0)  //Front Right
     {
         alpha = 85 - alpha - FRElbow;  //elbow (- is up)
@@ -660,36 +662,13 @@ void polar_to_servo(int leg, float alpha, float beta, float gamma) {
     pwm.setPWM(servo_pin[leg][2], 0, GA);
 }
 
-/*
-  - microservos service /timer interrupt function/50Hz
-  - when set site expected,this function move the end point to it in a straight line
-  - temp_speed[4][3] should be set before set expect site,it make sure the end point
-   move in a straight line,and decide move speed.
-   ---------------------------------------------------------------------------*/
-void servo_service(void) {
-    sei();
-    static float alpha, beta, gamma;
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 3; j++) {
-            if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
-                site_now[i][j] += temp_speed[i][j];
-            else
-                site_now[i][j] = site_expect[i][j];
-        }
-
-        cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
-        polar_to_servo(i, alpha, beta, gamma);
-    }
-
-    rest_counter++;
-}
-
 // This gets set as the default handler, and gets called when no other command matches.
 void unrecognized(const char *command) {
     Serial.println("What?");
 }
 
+
+#ifdef ENABLE_BLUETOOTH
 void action_cmd (void) {
     char *arg;
     int action_mode, n_step;
@@ -699,6 +678,7 @@ void action_cmd (void) {
     n_step = atoi(arg);
     servos_cmd (action_mode, n_step);
 }
+#endif
 
 void servos_cmd(int action_mode, int n_step) {
     Serial.println("Action:");
@@ -906,19 +886,75 @@ void servos_cmd(int action_mode, int n_step) {
     }
 }
 
-void commRead() {
-    SCmd.readSerial(btSerial);
-}
+/*
+  - microservos service /timer interrupt function/50Hz
+  - when set site expected,this function move the end point to it in a straight line
+  - temp_speed[4][3] should be set before set expect site,it make sure the end point
+   move in a straight line,and decide move speed.
+   ---------------------------------------------------------------------------*/
 
-String getLastComm() {
-    return lastComm;
+hw_timer_t * timer = NULL;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+uint32_t cp0_regs[18];
+
+
+void IRAM_ATTR servo_service(void) {
+    sei();
+    portENTER_CRITICAL_ISR(&timerMux);
+
+    // get FPU state
+    uint32_t cp_state = xthal_get_cpenable();
+  
+    if(cp_state) {
+    // Save FPU registers
+    xthal_save_cp0(cp0_regs);
+    } else {
+    // enable FPU
+    xthal_set_cpenable(1);
+    }
+
+    static float alpha, beta, gamma;
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
+                site_now[i][j] += temp_speed[i][j];
+            else
+                site_now[i][j] = site_expect[i][j];
+        }
+
+        cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
+        polar_to_servo(i, alpha, beta, gamma);
+    }
+
+    rest_counter++;
+
+    #if (TIMER_INTERRUPT_DEBUG > 0)
+    Serial.println("ITimer1: millis() = " + String(millis()));
+    #endif
+
+    if(cp_state) {
+    // Restore FPU registers
+    xthal_restore_cp0(cp0_regs);
+    } else {
+    // turn it back off
+    xthal_set_cpenable(0);
+    }
+    portEXIT_CRITICAL_ISR(&timerMux);
 }
 
 void servos_init() {
+    Wire.begin(SDA_PIN,SCL_PIN);
     pwm.begin();
     pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
+
+
+#ifdef ENABLE_BLUETOOTH
     SCmd.addCommand("w", action_cmd);
     SCmd.setDefaultHandler(unrecognized);
+    btSerial.begin("QuadPod");
+    Serial.println("BT Serial ready");
+#endif
 
     //initialize default parameter
     set_site(0, x_default - x_offset, y_start + y_step, z_boot);
@@ -935,20 +971,36 @@ void servos_init() {
     // FlexiTimer2::start();
     // Serial.println("Servo service started");
 
-    btSerial.begin("QuadPod");
-    Serial.println("BT Serial ready");
+
+    // Configure Prescaler to 80, as our timer runs @ 80Mhz
+	// Giving an output of 80,000,000 / 80 = 1,000,000 ticks / second
+	timer = timerBegin(0, 80, true);                
+	timerAttachInterrupt(timer, &servo_service, true);    
+	// Fire Interrupt every 1m ticks, so 1s
+	timerAlarmWrite(timer,20000, true);
+	timerAlarmEnable(timer);
 
     //initialize servos
-    servo_service();  // TODO: provisional initialization witout Timer
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
 
-    // sit();
-    // b_init();
+    sit();
+    b_init();
+}
+
+
+#ifdef ENABLE_BLUETOOTH
+void commRead() {
+    SCmd.readSerial(btSerial);
+}
+#endif
+
+String getLastComm() {
+    return lastComm;
 }
 
 void servos_loop() {
-    commRead();
+    // commRead();
     if (getLastComm() == "FWD") {
         step_forward(1);
     }
@@ -962,8 +1014,7 @@ void servos_loop() {
         turn_right(1);
     }
     // Serial.println(getLastComm());
-    // turn_right(1); //test
-    servo_service();
-    delay(100);
+    turn_right(1); //test
+    delay(1000);
 }
 
