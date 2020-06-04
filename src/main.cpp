@@ -44,8 +44,9 @@ void loop() {
     //-------------------
     servos_loop();
 
-    if(action++>10000) {
-        Serial.println("action 4 1");
-        servos_cmd(4,1);
+    if(action++==100000) {
+        // Serial.println("action 4 1");
+        // servos_cmd(4,1);
+        servos_start();
     }
 }

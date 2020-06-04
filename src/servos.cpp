@@ -897,6 +897,8 @@ hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 uint32_t cp0_regs[18];
 
+
+/*
 void IRAM_ATTR servo_service(void) {
     sei();
     portENTER_CRITICAL_ISR(&timerMux);
@@ -941,6 +943,24 @@ void IRAM_ATTR servo_service(void) {
     }
     portEXIT_CRITICAL_ISR(&timerMux);
 }
+*/
+
+void servo_service(void) {
+    static float alpha, beta, gamma;
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
+                site_now[i][j] += temp_speed[i][j];
+            else
+                site_now[i][j] = site_expect[i][j];
+        }
+
+        cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
+        polar_to_servo(i, alpha, beta, gamma);
+    }
+}
+
 
 void servos_init() {
     Wire.begin(SDA_PIN,SCL_PIN);
@@ -973,18 +993,23 @@ void servos_init() {
 
     // Configure Prescaler to 80, as our timer runs @ 80Mhz
 	// Giving an output of 80,000,000 / 80 = 1,000,000 ticks / second
-	timer = timerBegin(0, 80, true);                
-	timerAttachInterrupt(timer, &servo_service, true);    
+	// timer = timerBegin(0, 80, true);                
+	// timerAttachInterrupt(timer, &servo_service, true);    
 	// Fire Interrupt every 1m ticks, so 1s
-	timerAlarmWrite(timer,20000, true);
-	timerAlarmEnable(timer);
+	// timerAlarmWrite(timer,20000, true);
+	// timerAlarmEnable(timer);
 
-    sit();
-    b_init();
+    // sit();
+    // b_init();
 
     //initialize servos
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
+}
+
+void servos_start() {
+    sit();
+    b_init();
 }
 
 
@@ -1012,6 +1037,7 @@ void servos_loop() {
     if (getLastComm() == "RGT") {
         turn_right(1);
     }
+    servo_service();
     // Serial.println(getLastComm());
     // turn_right(40); //test
     // delay(1000);
