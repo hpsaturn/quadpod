@@ -21,6 +21,7 @@ int ledPulse = 0;
 void setup() {
     //start serial for debug
     Serial.begin(115200);
+    delay(1000);
     Serial.println("Robot starts initialization");
     pinMode(LED_BUILTIN, OUTPUT);
     delay(5000);
@@ -42,11 +43,19 @@ void loop() {
     }
     ledPulse++;
     //-------------------
-    servos_loop();
+    // Serial.println("ITimer1: millis() = " + String(millis()));
+    // servos_loop();
 
-    if(action++==100000) {
+    if(action++==10000) {
+        Serial.println("Start");
         // Serial.println("action 4 1");
         // servos_cmd(4,1);
         servos_start();
+    }
+
+    if(action++==20000) {
+        Serial.println("Dance");
+        Serial.println("action 7 1");
+        servos_cmd(7,1);
     }
 }

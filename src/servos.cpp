@@ -24,16 +24,21 @@ const float x_default = 62, x_offset = 0;
 const float y_start = 0, y_step = 40;
 const float y_default = x_default;
 /* variables for movement ----------------------------------------------------*/
-volatile float site_now[4][3];     //real-time coordinates of the end of each leg
-volatile float site_expect[4][3];  //expected coordinates of the end of each leg
-float temp_speed[4][3];            //each axis' speed, needs to be recalculated before each movement
+typedef struct {
+    float site_now[4][3];     //real-time coordinates of the end of each leg
+    float site_expect[4][3];  //expected coordinates of the end of each leg
+    float temp_speed[4][3];   //each axis' speed, needs to be recalculated before each movement
+} service_status_t;
+
+service_status_t sst;
+
 float move_speed = 1.4;            //movement speed
 float speed_multiple = 1;          //movement speed multiple
 const float spot_turn_speed = 4;
 const float leg_move_speed = 8;
 const float body_move_speed = 3;
 const float stand_seat_speed = 1;
-volatile int rest_counter;  //+1/0.02s, for automatic rest
+uint16_t rest_counter;  //+1/0.02s, for automatic rest
 //functions' parameter
 const float KEEP = 255;
 //define PI for calculation
@@ -72,9 +77,9 @@ int RLShdr = 0;
    ---------------------------------------------------------------------------*/
 void wait_reach(int leg) {
     while (1)
-        if (site_now[leg][0] == site_expect[leg][0])
-            if (site_now[leg][1] == site_expect[leg][1])
-                if (site_now[leg][2] == site_expect[leg][2])
+        if (sst.site_now[leg][0] == sst.site_expect[leg][0])
+            if (sst.site_now[leg][1] == sst.site_expect[leg][1])
+                if (sst.site_now[leg][2] == sst.site_expect[leg][2])
                     break;
 }
 
@@ -108,31 +113,31 @@ void set_site(int leg, float x, float y, float z) {
     float length_x = 0, length_y = 0, length_z = 0;
 
     if (x != KEEP)
-        length_x = x - site_now[leg][0];
+        length_x = x - sst.site_now[leg][0];
     if (y != KEEP)
-        length_y = y - site_now[leg][1];
+        length_y = y - sst.site_now[leg][1];
     if (z != KEEP)
-        length_z = z - site_now[leg][2];
+        length_z = z - sst.site_now[leg][2];
 
     float length = sqrt(pow(length_x, 2) + pow(length_y, 2) + pow(length_z, 2));
 
-    temp_speed[leg][0] = length_x / length * move_speed * speed_multiple;
-    temp_speed[leg][1] = length_y / length * move_speed * speed_multiple;
-    temp_speed[leg][2] = length_z / length * move_speed * speed_multiple;
+    sst.temp_speed[leg][0] = length_x / length * move_speed * speed_multiple;
+    sst.temp_speed[leg][1] = length_y / length * move_speed * speed_multiple;
+    sst.temp_speed[leg][2] = length_z / length * move_speed * speed_multiple;
 
     if (x != KEEP)
-        site_expect[leg][0] = x;
+        sst.site_expect[leg][0] = x;
     if (y != KEEP)
-        site_expect[leg][1] = y;
+        sst.site_expect[leg][1] = y;
     if (z != KEEP)
-        site_expect[leg][2] = z;
+        sst.site_expect[leg][2] = z;
 }
 
 /*
   - is_stand
    ---------------------------------------------------------------------------*/
 bool is_stand(void) {
-    if (site_now[0][2] == z_default)
+    if (sst.site_now[0][2] == z_default)
         return true;
     else
         return false;
@@ -183,7 +188,7 @@ void b_init(void) {
 void turn_left(unsigned int step) {
     move_speed = spot_turn_speed;
     while (step-- > 0) {
-        if (site_now[3][1] == y_start) {
+        if (sst.site_now[3][1] == y_start) {
             //leg 3&1 move
             set_site(3, x_default + x_offset, y_start, z_up);
             wait_all_reach();
@@ -257,7 +262,7 @@ void turn_left(unsigned int step) {
 void turn_right(unsigned int step) {
     move_speed = spot_turn_speed;
     while (step-- > 0) {
-        if (site_now[2][1] == y_start) {
+        if (sst.site_now[2][1] == y_start) {
             //leg 2&0 move
             set_site(2, x_default + x_offset, y_start, z_up);
             wait_all_reach();
@@ -331,7 +336,7 @@ void turn_right(unsigned int step) {
 void step_forward(unsigned int step) {
     move_speed = leg_move_speed;
     while (step-- > 0) {
-        if (site_now[2][1] == y_start) {
+        if (sst.site_now[2][1] == y_start) {
             //leg 2&1 move
             set_site(2, x_default + x_offset, y_start, z_up);
             wait_all_reach();
@@ -393,7 +398,7 @@ void step_forward(unsigned int step) {
 void step_back(unsigned int step) {
     move_speed = leg_move_speed;
     while (step-- > 0) {
-        if (site_now[3][1] == y_start) {
+        if (sst.site_now[3][1] == y_start) {
             //leg 3&0 move
             set_site(3, x_default + x_offset, y_start, z_up);
             wait_all_reach();
@@ -450,18 +455,18 @@ void step_back(unsigned int step) {
 // add by RegisHsu
 
 void body_left(int i) {
-    set_site(0, site_now[0][0] + i, KEEP, KEEP);
-    set_site(1, site_now[1][0] + i, KEEP, KEEP);
-    set_site(2, site_now[2][0] - i, KEEP, KEEP);
-    set_site(3, site_now[3][0] - i, KEEP, KEEP);
+    set_site(0, sst.site_now[0][0] + i, KEEP, KEEP);
+    set_site(1, sst.site_now[1][0] + i, KEEP, KEEP);
+    set_site(2, sst.site_now[2][0] - i, KEEP, KEEP);
+    set_site(3, sst.site_now[3][0] - i, KEEP, KEEP);
     wait_all_reach();
 }
 
 void body_right(int i) {
-    set_site(0, site_now[0][0] - i, KEEP, KEEP);
-    set_site(1, site_now[1][0] - i, KEEP, KEEP);
-    set_site(2, site_now[2][0] + i, KEEP, KEEP);
-    set_site(3, site_now[3][0] + i, KEEP, KEEP);
+    set_site(0, sst.site_now[0][0] - i, KEEP, KEEP);
+    set_site(1, sst.site_now[1][0] - i, KEEP, KEEP);
+    set_site(2, sst.site_now[2][0] + i, KEEP, KEEP);
+    set_site(3, sst.site_now[3][0] + i, KEEP, KEEP);
     wait_all_reach();
 }
 
@@ -470,11 +475,11 @@ void hand_wave(int i) {
     float y_tmp;
     float z_tmp;
     move_speed = 1;
-    if (site_now[3][1] == y_start) {
+    if (sst.site_now[3][1] == y_start) {
         body_right(15);
-        x_tmp = site_now[2][0];
-        y_tmp = site_now[2][1];
-        z_tmp = site_now[2][2];
+        x_tmp = sst.site_now[2][0];
+        y_tmp = sst.site_now[2][1];
+        z_tmp = sst.site_now[2][2];
         move_speed = body_move_speed;
         for (int j = 0; j < i; j++) {
             set_site(2, turn_x1, turn_y1, 50);
@@ -488,9 +493,9 @@ void hand_wave(int i) {
         body_left(15);
     } else {
         body_left(15);
-        x_tmp = site_now[0][0];
-        y_tmp = site_now[0][1];
-        z_tmp = site_now[0][2];
+        x_tmp = sst.site_now[0][0];
+        y_tmp = sst.site_now[0][1];
+        z_tmp = sst.site_now[0][2];
         move_speed = body_move_speed;
         for (int j = 0; j < i; j++) {
             set_site(0, turn_x1, turn_y1, 50);
@@ -510,11 +515,11 @@ void hand_shake(int i) {
     float y_tmp;
     float z_tmp;
     move_speed = 1;
-    if (site_now[3][1] == y_start) {
+    if (sst.site_now[3][1] == y_start) {
         body_right(15);
-        x_tmp = site_now[2][0];
-        y_tmp = site_now[2][1];
-        z_tmp = site_now[2][2];
+        x_tmp = sst.site_now[2][0];
+        y_tmp = sst.site_now[2][1];
+        z_tmp = sst.site_now[2][2];
         move_speed = body_move_speed;
         for (int j = 0; j < i; j++) {
             set_site(2, x_default - 30, y_start + 2 * y_step, 55);
@@ -528,9 +533,9 @@ void hand_shake(int i) {
         body_left(15);
     } else {
         body_left(15);
-        x_tmp = site_now[0][0];
-        y_tmp = site_now[0][1];
-        z_tmp = site_now[0][2];
+        x_tmp = sst.site_now[0][0];
+        y_tmp = sst.site_now[0][1];
+        z_tmp = sst.site_now[0][2];
         move_speed = body_move_speed;
         for (int j = 0; j < i; j++) {
             set_site(0, x_default - 30, y_start + 2 * y_step, 55);
@@ -546,18 +551,18 @@ void hand_shake(int i) {
 }
 
 void head_up(int i) {
-    set_site(0, KEEP, KEEP, site_now[0][2] - i);
-    set_site(1, KEEP, KEEP, site_now[1][2] + i);
-    set_site(2, KEEP, KEEP, site_now[2][2] - i);
-    set_site(3, KEEP, KEEP, site_now[3][2] + i);
+    set_site(0, KEEP, KEEP, sst.site_now[0][2] - i);
+    set_site(1, KEEP, KEEP, sst.site_now[1][2] + i);
+    set_site(2, KEEP, KEEP, sst.site_now[2][2] - i);
+    set_site(3, KEEP, KEEP, sst.site_now[3][2] + i);
     wait_all_reach();
 }
 
 void head_down(int i) {
-    set_site(0, KEEP, KEEP, site_now[0][2] + i);
-    set_site(1, KEEP, KEEP, site_now[1][2] - i);
-    set_site(2, KEEP, KEEP, site_now[2][2] + i);
-    set_site(3, KEEP, KEEP, site_now[3][2] - i);
+    set_site(0, KEEP, KEEP, sst.site_now[0][2] + i);
+    set_site(1, KEEP, KEEP, sst.site_now[1][2] - i);
+    set_site(2, KEEP, KEEP, sst.site_now[2][2] + i);
+    set_site(3, KEEP, KEEP, sst.site_now[3][2] - i);
     wait_all_reach();
 }
 
@@ -606,7 +611,7 @@ void body_dance(int i) {
   - trans site from cartesian to polar
   - mathematical model 2/2
    ---------------------------------------------------------------------------*/
-void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile float &gamma, volatile float x, volatile float y, volatile float z) {
+void cartesian_to_polar(float &alpha, float &beta, float &gamma, float x, float y, float z) {
     //calculate w-z degree
     float v, w;
     w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
@@ -892,14 +897,12 @@ void servos_cmd(int action_mode, int n_step) {
   - temp_speed[4][3] should be set before set expect site,it make sure the end point
    move in a straight line,and decide move speed.
    ---------------------------------------------------------------------------*/
-
+/*
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 uint32_t cp0_regs[18];
 
-
-/*
-void IRAM_ATTR servo_service(void) {
+IRAM_ATTR void servo_service(void) {
     sei();
     portENTER_CRITICAL_ISR(&timerMux);
 
@@ -931,7 +934,8 @@ void IRAM_ATTR servo_service(void) {
     rest_counter++;
 
 #if (TIMER_INTERRUPT_DEBUG > 0)
-    Serial.println("ITimer1: millis() = " + String(millis()));
+    // Serial.println("ITimer1: millis() = " + String(millis()));
+    Serial.println("servos service counter: " + rest_counter);
 #endif
 
     if (cp_state) {
@@ -945,24 +949,35 @@ void IRAM_ATTR servo_service(void) {
 }
 */
 
-void servo_service(void) {
-    static float alpha, beta, gamma;
+void servo_service(void * data) {
+    service_status_t sst = *(service_status_t *)data;
+    for (;;) {
+        static float alpha, beta, gamma;
 
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 3; j++) {
-            if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
-                site_now[i][j] += temp_speed[i][j];
-            else
-                site_now[i][j] = site_expect[i][j];
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (abs(sst.site_now[i][j] - sst.site_expect[i][j]) >= abs(sst.temp_speed[i][j]))
+                    sst.site_now[i][j] += sst.temp_speed[i][j];
+                else
+                    sst.site_now[i][j] = sst.site_expect[i][j];
+            }
+
+            cartesian_to_polar(alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
+            polar_to_servo(i, alpha, beta, gamma);
         }
 
-        cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
-        polar_to_servo(i, alpha, beta, gamma);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
+
+#if (TIMER_INTERRUPT_DEBUG > 0)
+        // Serial.println("ITimer1: millis() = " + String(millis()));
+        Serial.println("servos service counter: " + String(sst.site_now[0][0]));
+#endif
     }
 }
 
 
 void servos_init() {
+    Serial.println("Starting servos..");
     Wire.begin(SDA_PIN,SCL_PIN);
     pwm.begin();
     pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
@@ -982,7 +997,7 @@ void servos_init() {
     set_site(3, x_default + x_offset, y_start, z_boot);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
-            site_now[i][j] = site_expect[i][j];
+            sst.site_now[i][j] = sst.site_expect[i][j];
         }
     }
     //start servo service
@@ -998,6 +1013,17 @@ void servos_init() {
 	// Fire Interrupt every 1m ticks, so 1s
 	// timerAlarmWrite(timer,20000, true);
 	// timerAlarmEnable(timer);
+
+    xTaskCreate(
+        servo_service,     // Function that should be called
+        "ServoService",  // Name of the task (for debugging)
+        1000,          // Stack size (bytes)
+        &sst,          // Parameter to pass
+        1,             // Task priority
+        NULL           // Task handle
+    );
+
+    delay(100);
 
     // sit();
     // b_init();
@@ -1037,8 +1063,8 @@ void servos_loop() {
     if (getLastComm() == "RGT") {
         turn_right(1);
     }
-    servo_service();
-    // Serial.println(getLastComm());
+    // servo_service();
+    // Serial.println(rest_counter);
     // turn_right(40); //test
     // delay(1000);
 }
