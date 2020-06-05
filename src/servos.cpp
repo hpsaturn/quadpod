@@ -30,7 +30,7 @@ typedef struct {
     float temp_speed[4][3];   //each axis' speed, needs to be recalculated before each movement
 } service_status_t;
 
-service_status_t sst;
+static volatile service_status_t sst;
 
 float move_speed = 1.4;            //movement speed
 float speed_multiple = 1;          //movement speed multiple
@@ -952,7 +952,7 @@ IRAM_ATTR void servo_service(void) {
 void servo_service(void * data) {
     service_status_t sst = *(service_status_t *)data;
     for (;;) {
-        static float alpha, beta, gamma;
+        float alpha, beta, gamma;
 
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 3; j++) {
@@ -961,12 +961,12 @@ void servo_service(void * data) {
                 else
                     sst.site_now[i][j] = sst.site_expect[i][j];
             }
-
+            Serial.printf("-->polar: alpha:%f beta:%f gamma:%f x:%f y:%f z:%f",alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
             cartesian_to_polar(alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
             polar_to_servo(i, alpha, beta, gamma);
         }
 
-        vTaskDelay(20 / portTICK_PERIOD_MS);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
 
 #if (TIMER_INTERRUPT_DEBUG > 0)
         // Serial.println("ITimer1: millis() = " + String(millis()));
@@ -975,13 +975,13 @@ void servo_service(void * data) {
     }
 }
 
+TaskHandle_t Task0;
 
 void servos_init() {
-    Serial.println("Starting servos..");
+    Serial.println("Starting PWM Library..");
     Wire.begin(SDA_PIN,SCL_PIN);
     pwm.begin();
     pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
-
 
 #ifdef ENABLE_BLUETOOTH
     SCmd.addCommand("w", action_cmd);
@@ -1000,28 +1000,17 @@ void servos_init() {
             sst.site_now[i][j] = sst.site_expect[i][j];
         }
     }
-    //start servo service
-    // FlexiTimer2::set(20, servo_service);
-    // FlexiTimer2::start();
-    // Serial.println("Servo service started");
 
+    Serial.println("Starting servos service..");
 
-    // Configure Prescaler to 80, as our timer runs @ 80Mhz
-	// Giving an output of 80,000,000 / 80 = 1,000,000 ticks / second
-	// timer = timerBegin(0, 80, true);                
-	// timerAttachInterrupt(timer, &servo_service, true);    
-	// Fire Interrupt every 1m ticks, so 1s
-	// timerAlarmWrite(timer,20000, true);
-	// timerAlarmEnable(timer);
-
-    xTaskCreate(
-        servo_service,     // Function that should be called
+    xTaskCreatePinnedToCore(
+        servo_service,   // Function that should be called
         "ServoService",  // Name of the task (for debugging)
-        1000,          // Stack size (bytes)
-        &sst,          // Parameter to pass
-        1,             // Task priority
-        NULL           // Task handle
-    );
+        100000,          // Stack size (bytes)
+        (void *)&sst,    // Parameter to pass
+        1,               // Task priority
+        &Task0,          // Task handle
+        1);
 
     delay(100);
 

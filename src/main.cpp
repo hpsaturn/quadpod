@@ -24,7 +24,7 @@ void setup() {
     delay(1000);
     Serial.println("Robot starts initialization");
     pinMode(LED_BUILTIN, OUTPUT);
-    delay(5000);
+    delay(2000);
     servos_init();
 }
 
