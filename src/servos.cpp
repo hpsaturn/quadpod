@@ -890,11 +890,13 @@ void servos_cmd(int action_mode, int n_step) {
     }
 }
 
+SemaphoreHandle_t Semaphore;
+
 void servo_service(void * data) {
     // service_status_t sst = *(service_status_t *)data;
     for (;;) {
         float alpha, beta, gamma;
-
+        xSemaphoreTake(Semaphore, portMAX_DELAY);
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 3; j++) {
                 if (abs(sst.site_now[i][j] - sst.site_expect[i][j]) >= abs(sst.temp_speed[i][j]))
@@ -912,6 +914,7 @@ void servo_service(void * data) {
             polar_to_servo(i, alpha, beta, gamma);
         }
         sst.rest_counter++;
+        xSemaphoreGive(Semaphore);
         vTaskDelay(20 / portTICK_PERIOD_MS);
         // Serial.printf("%05lu counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter++);
         
@@ -950,6 +953,9 @@ void servos_init() {
         }
     }
     Serial.println("Starting servos service..");
+
+    // Simple flag, up or down
+	Semaphore = xSemaphoreCreateMutex();
 
     xTaskCreatePinnedToCore(
         servo_service,   // Function that should be called

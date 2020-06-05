@@ -58,4 +58,9 @@ void loop() {
     //     Serial.println("action 7 1");
     //     servos_cmd(7,1);
     // }
+
+    if(action++==50) {
+        servos_cmd(1,2);
+    }
+
 }
