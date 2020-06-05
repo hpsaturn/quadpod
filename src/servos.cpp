@@ -40,9 +40,10 @@ typedef struct {
     int RLFoot = 0;
     int RLElbow = 0;
     int RLShdr = 0;
+    uint32_t rest_counter = 0;  //+1/0.02s, for automatic rest
 } service_status_t;
 
-static volatile service_status_t sst;
+service_status_t sst;
 
 float move_speed = 1.4;            //movement speed
 float speed_multiple = 1;          //movement speed multiple
@@ -50,7 +51,6 @@ const float spot_turn_speed = 4;
 const float leg_move_speed = 8;
 const float body_move_speed = 3;
 const float stand_seat_speed = 1;
-static uint16_t rest_counter;  //+1/0.02s, for automatic rest
 //functions' parameter
 const float KEEP = 255;
 //define PI for calculation
@@ -566,9 +566,6 @@ void head_down(int i) {
 }
 
 void body_dance(int i) {
-    float x_tmp;
-    float y_tmp;
-    float z_tmp;
     float body_dance_speed = 2;
     sit();
     move_speed = 1;
@@ -894,7 +891,7 @@ void servos_cmd(int action_mode, int n_step) {
 }
 
 void servo_service(void * data) {
-    service_status_t sst = *(service_status_t *)data;
+    // service_status_t sst = *(service_status_t *)data;
     for (;;) {
         float alpha, beta, gamma;
 
@@ -914,8 +911,9 @@ void servo_service(void * data) {
 #endif            
             polar_to_servo(i, alpha, beta, gamma, sst);
         }
-
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        sst.rest_counter++;
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        // Serial.printf("%05lu counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter++);
         
 #ifdef TIMER_INTERRUPT_DEBUG
         Serial.printf("[OUT]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
@@ -956,7 +954,7 @@ void servos_init() {
     xTaskCreatePinnedToCore(
         servo_service,   // Function that should be called
         "ServoService",  // Name of the task (for debugging)
-        100000,          // Stack size (bytes)
+        200000,          // Stack size (bytes)
         (void *)&sst,    // Parameter to pass
         1,               // Task priority
         &Task0,          // Task handle
@@ -999,13 +997,15 @@ void servos_loop() {
         turn_right(1);
     }
 
+    // Serial.printf("[LP]\tFL:%i\tFR:%i\tRL:%i\tx:%f\ty:%f\tz:%f\n",sst.FLShdr,sst.FRShdr,sst.RLShdr,sst.site_now[0][0], sst.site_now[0][1], sst.site_now[0][2]);
+
+    // Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
 #ifdef TIMER_INTERRUPT_DEBUG
-    Serial.printf("[IN ]\tA:%f\tB:%f\tG:%f\tx:%f\ty:%f\tz:%f\n",alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
 #endif
 
     // servo_service();
     // Serial.println(rest_counter);
     // turn_right(40); //test
-    // delay(1000);
+    delay(100);
 }
 

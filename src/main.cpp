@@ -44,16 +44,16 @@ void loop() {
     ledPulse++;
     //-------------------
     // Serial.println("ITimer1: millis() = " + String(millis()));
-    // servos_loop();
+    servos_loop();
 
-    if(action++==10000) {
-        Serial.println("Start");
-        // Serial.println("action 4 1");
-        // servos_cmd(4,1);
-        servos_start();
-    }
+    // if(action++==10000) {
+    //     Serial.println("Start");
+    //     // Serial.println("action 4 1");
+    //     // servos_cmd(4,1);
+    //     servos_start();
+    // }
 
-    if(action++==20000) {
+    if(action++==100) {
         Serial.println("Dance");
         Serial.println("action 7 1");
         servos_cmd(7,1);
