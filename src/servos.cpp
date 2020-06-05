@@ -627,7 +627,7 @@ void cartesian_to_polar(float &alpha, float &beta, float &gamma, float x, float 
   - mathematical model map to fact
   - the errors saved in eeprom will be add
    ---------------------------------------------------------------------------*/
-void polar_to_servo(int leg, float alpha, float beta, float gamma, service_status_t sst) {
+void polar_to_servo(int leg, float alpha, float beta, float gamma) {
     if (leg == 0)  //Front Right
     {
         alpha = 85 - alpha - sst.FRElbow;  //elbow (- is up)
@@ -903,16 +903,16 @@ void servo_service(void * data) {
                     sst.site_now[i][j] = sst.site_expect[i][j];
             }
 #ifdef TIMER_INTERRUPT_DEBUG
-            Serial.printf("[IN ]\tA:%f\tB:%f\tG:%f\tx:%f\ty:%f\tz:%f\n",alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
+            // Serial.printf("[IN ]\tA:%f\tB:%f\tG:%f\tx:%f\ty:%f\tz:%f\n",alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
 #endif            
             cartesian_to_polar(alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
 #ifdef TIMER_INTERRUPT_DEBUG
-            Serial.printf("[PIN]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
+            // Serial.printf("[PIN]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
 #endif            
-            polar_to_servo(i, alpha, beta, gamma, sst);
+            polar_to_servo(i, alpha, beta, gamma);
         }
         sst.rest_counter++;
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
         // Serial.printf("%05lu counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter++);
         
 #ifdef TIMER_INTERRUPT_DEBUG
@@ -954,7 +954,7 @@ void servos_init() {
     xTaskCreatePinnedToCore(
         servo_service,   // Function that should be called
         "ServoService",  // Name of the task (for debugging)
-        200000,          // Stack size (bytes)
+        100000,          // Stack size (bytes)
         (void *)&sst,    // Parameter to pass
         1,               // Task priority
         &Task0,          // Task handle
@@ -963,6 +963,7 @@ void servos_init() {
     delay(100);
 
     //initialize servos
+    // servos_start();
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
 }
@@ -999,7 +1000,7 @@ void servos_loop() {
 
     // Serial.printf("[LP]\tFL:%i\tFR:%i\tRL:%i\tx:%f\ty:%f\tz:%f\n",sst.FLShdr,sst.FRShdr,sst.RLShdr,sst.site_now[0][0], sst.site_now[0][1], sst.site_now[0][2]);
 
-    // Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
+    Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
 #ifdef TIMER_INTERRUPT_DEBUG
 #endif
 
