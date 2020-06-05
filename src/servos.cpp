@@ -891,64 +891,6 @@ void servos_cmd(int action_mode, int n_step) {
     }
 }
 
-/*
-  - microservos service /timer interrupt function/50Hz
-  - when set site expected,this function move the end point to it in a straight line
-  - temp_speed[4][3] should be set before set expect site,it make sure the end point
-   move in a straight line,and decide move speed.
-   ---------------------------------------------------------------------------*/
-/*
-hw_timer_t * timer = NULL;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-uint32_t cp0_regs[18];
-
-IRAM_ATTR void servo_service(void) {
-    sei();
-    portENTER_CRITICAL_ISR(&timerMux);
-
-    // get FPU state
-    uint32_t cp_state = xthal_get_cpenable();
-
-    if (cp_state) {
-        // Save FPU registers
-        xthal_save_cp0(cp0_regs);
-    } else {
-        // enable FPU
-        xthal_set_cpenable(1);
-    }
-
-    static float alpha, beta, gamma;
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 3; j++) {
-            if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
-                site_now[i][j] += temp_speed[i][j];
-            else
-                site_now[i][j] = site_expect[i][j];
-        }
-
-        cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
-        polar_to_servo(i, alpha, beta, gamma);
-    }
-
-    rest_counter++;
-
-#if (TIMER_INTERRUPT_DEBUG > 0)
-    // Serial.println("ITimer1: millis() = " + String(millis()));
-    Serial.println("servos service counter: " + rest_counter);
-#endif
-
-    if (cp_state) {
-        // Restore FPU registers
-        xthal_restore_cp0(cp0_regs);
-    } else {
-        // turn it back off
-        xthal_set_cpenable(0);
-    }
-    portEXIT_CRITICAL_ISR(&timerMux);
-}
-*/
-
 void servo_service(void * data) {
     service_status_t sst = *(service_status_t *)data;
     for (;;) {
@@ -961,16 +903,20 @@ void servo_service(void * data) {
                 else
                     sst.site_now[i][j] = sst.site_expect[i][j];
             }
-            Serial.printf("-->polar: alpha:%f beta:%f gamma:%f x:%f y:%f z:%f",alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
+#ifdef TIMER_INTERRUPT_DEBUG
+            Serial.printf("[IN ]\tA:%f\tB:%f\tG:%f\tx:%f\ty:%f\tz:%f\n",alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
+#endif            
             cartesian_to_polar(alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
+#ifdef TIMER_INTERRUPT_DEBUG
+            Serial.printf("[PIN]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
+#endif            
             polar_to_servo(i, alpha, beta, gamma);
         }
 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-
-#if (TIMER_INTERRUPT_DEBUG > 0)
-        // Serial.println("ITimer1: millis() = " + String(millis()));
-        Serial.println("servos service counter: " + String(sst.site_now[0][0]));
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        
+#ifdef TIMER_INTERRUPT_DEBUG
+        Serial.printf("[OUT]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
 #endif
     }
 }
@@ -991,16 +937,18 @@ void servos_init() {
 #endif
 
     //initialize default parameter
+    Serial.println("Default parameters:");
     set_site(0, x_default - x_offset, y_start + y_step, z_boot);
     set_site(1, x_default - x_offset, y_start + y_step, z_boot);
     set_site(2, x_default + x_offset, y_start, z_boot);
     set_site(3, x_default + x_offset, y_start, z_boot);
+    Serial.printf("X:%f\tY:%f\tZ:%f\n",x_default,y_start,z_boot);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
             sst.site_now[i][j] = sst.site_expect[i][j];
+            Serial.printf("site_now:%f\n",sst.site_now[i][j]);
         }
     }
-
     Serial.println("Starting servos service..");
 
     xTaskCreatePinnedToCore(
@@ -1013,9 +961,6 @@ void servos_init() {
         1);
 
     delay(100);
-
-    // sit();
-    // b_init();
 
     //initialize servos
     Serial.println("Servos initialized");
@@ -1052,6 +997,11 @@ void servos_loop() {
     if (getLastComm() == "RGT") {
         turn_right(1);
     }
+
+#ifdef TIMER_INTERRUPT_DEBUG
+    Serial.printf("[IN ]\tA:%f\tB:%f\tG:%f\tx:%f\ty:%f\tz:%f\n",alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
+#endif
+
     // servo_service();
     // Serial.println(rest_counter);
     // turn_right(40); //test
