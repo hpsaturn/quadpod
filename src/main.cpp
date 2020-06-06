@@ -53,7 +53,7 @@ void loop() {
     //     servos_start();
     // }
 
-    // if(action++==100) {
+    // if(action++==30) {
     //     Serial.println("Dance");
     //     Serial.println("action 7 1");
     //     servos_cmd(7,1);

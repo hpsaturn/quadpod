@@ -6,6 +6,10 @@ BluetoothSerial btSerial; //Object for Bluetooth
 #endif
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
+#define MIN_PULSE_WIDTH 600
+#define MAX_PULSE_WIDTH 2600
+#define FREQUENCY 50
+
 /* Servos --------------------------------------------------------------------*/
 //define 12 servos for 4 legs
 
@@ -69,17 +73,30 @@ const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
 /* ---------------------------------------------------------------------------*/
 boolean Demo_mode = true;
 String lastComm = "";
-
+boolean print_reach = false;
 /*
   - wait one of end points move to expect site
   - blocking function
    ---------------------------------------------------------------------------*/
 void wait_reach(int leg) {
-    while (1)
-        if (sst.site_now[leg][0] == sst.site_expect[leg][0])
-            if (sst.site_now[leg][1] == sst.site_expect[leg][1])
-                if (sst.site_now[leg][2] == sst.site_expect[leg][2])
+    while (1){
+        if(print_reach){
+            Serial.printf("%i now:%f exp:%f\n", leg, sst.site_now[leg][0], sst.site_expect[leg][0]);
+            Serial.printf("%i now:%f exp:%f\n", leg, sst.site_now[leg][1], sst.site_expect[leg][1]);
+            Serial.printf("%i now:%f exp:%f\n", leg, sst.site_now[leg][2], sst.site_expect[leg][2]);
+        }
+        // Serial.println("now vs expect in leg: "+ String(leg));
+        if (sst.site_now[leg][0] == sst.site_expect[leg][0]){
+            // Serial.println("0-> true");
+            if (sst.site_now[leg][1] == sst.site_expect[leg][1]){
+                // Serial.println("1-> true");
+                if (sst.site_now[leg][2] == sst.site_expect[leg][2]){
+                    // Serial.println("2-> true");
                     break;
+                }
+            }
+        }
+    }
 }
 
 /*
@@ -573,6 +590,8 @@ void body_dance(int i) {
     set_site(1, x_default, y_default, KEEP);
     set_site(2, x_default, y_default, KEEP);
     set_site(3, x_default, y_default, KEEP);
+    Serial.println("mark");
+    print_reach = true;
     wait_all_reach();
     stand();
     set_site(0, x_default, y_default, z_default - 20);
@@ -601,69 +620,6 @@ void body_dance(int i) {
     move_speed = body_dance_speed;
     head_down(30);
     b_init();
-}
-
-/*
-  - trans site from cartesian to polar
-  - mathematical model 2/2
-   ---------------------------------------------------------------------------*/
-void cartesian_to_polar(float &alpha, float &beta, float &gamma, float x, float y, float z) {
-    //calculate w-z degree
-    float v, w;
-    w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
-    v = w - length_c;
-    alpha = atan2(z, v) + acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) / 2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
-    beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) / 2 / length_a / length_b);
-    //calculate x-y-z degree
-    gamma = (w >= 0) ? atan2(y, x) : atan2(-y, -x);
-    //trans degree pi->180
-    alpha = alpha / pi * 180;
-    beta = beta / pi * 180;
-    gamma = gamma / pi * 180;
-}
-
-/*
-  - trans site from polar to microservos
-  - mathematical model map to fact
-  - the errors saved in eeprom will be add
-   ---------------------------------------------------------------------------*/
-void polar_to_servo(int leg, float alpha, float beta, float gamma) {
-    if (leg == 0)  //Front Right
-    {
-        alpha = 85 - alpha - sst.FRElbow;  //elbow (- is up)
-        beta = beta + 40 - sst.FRFoot;     //foot (- is up)
-        gamma += 115 - sst.FRShdr;         // shoulder (- is left)
-    } else if (leg == 1)               //Rear Right
-    {
-        alpha += 90 + sst.RRElbow;         //elbow (+ is up)
-        beta = 115 - beta + sst.RRFoot;    //foot (+ is up)
-        gamma = 115 - gamma + sst.RRShdr;  // shoulder (+ is left)
-    } else if (leg == 2)               //Front Left
-    {
-        alpha += 75 + sst.FLElbow;         //elbow (+ is up)
-        beta = 140 - beta + sst.FLFoot;    //foot (+ is up)
-        gamma = 115 - gamma + sst.FLShdr;  // shoulder (+ is left)
-    } else if (leg == 3)               // Rear Left
-    {
-        alpha = 90 - alpha - sst.RLElbow;  //elbow (- is up)
-        beta = beta + 50 - sst.RLFoot;     //foot; (- is up)
-        gamma += 100 - sst.RLShdr;         // shoulder (- is left)
-    }
-#ifdef TIMER_INTERRUPT_DEBUG
-    Serial.printf("[PIN]\tA:%f\tB:%f\tG:%f\n");
-#endif
-    int AL = ((850 / 180) * alpha);
-    if (AL > 580) AL = 580;
-    if (AL < 125) AL = 125;
-    pwm.setPWM(servo_pin[leg][0], 0, AL);
-    int BE = ((850 / 180) * beta);
-    if (BE > 580) BE = 580;
-    if (BE < 125) BE = 125;
-    pwm.setPWM(servo_pin[leg][1], 0, BE);
-    int GA = ((580 / 180) * gamma);
-    if (GA > 580) GA = 580;
-    if (GA < 125) GA = 125;
-    pwm.setPWM(servo_pin[leg][2], 0, GA);
 }
 
 // This gets set as the default handler, and gets called when no other command matches.
@@ -890,6 +846,76 @@ void servos_cmd(int action_mode, int n_step) {
     }
 }
 
+/*
+  - trans site from cartesian to polar
+  - mathematical model 2/2
+   ---------------------------------------------------------------------------*/
+void cartesian_to_polar(float &alpha, float &beta, float &gamma, float x, float y, float z) {
+    //calculate w-z degree
+    float v, w;
+    w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
+    v = w - length_c;
+    alpha = atan2(z, v) + acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) / 2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
+    beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) / 2 / length_a / length_b);
+    //calculate x-y-z degree
+    gamma = (w >= 0) ? atan2(y, x) : atan2(-y, -x);
+    //trans degree pi->180
+    alpha = alpha / pi * 180.0;
+    beta = beta / pi * 180.0;
+    gamma = gamma / pi * 180.0;
+}
+
+void print_final_PWM (int pin, uint16_t off){
+#ifdef TIMER_INTERRUPT_DEBUG
+    Serial.printf("[PWM]\tP:%i\toff:%u\n",pin,off);
+#endif
+}
+
+/*
+  - trans site from polar to microservos
+  - mathematical model map to fact
+  - the errors saved in eeprom will be add
+   ---------------------------------------------------------------------------*/
+void polar_to_servo(int leg, float alpha, float beta, float gamma) {
+    if (leg == 0)  //Front Right
+    {
+        alpha = 85 - alpha - sst.FRElbow;  //elbow (- is up)
+        beta = beta + 40 - sst.FRFoot;     //foot (- is up)
+        gamma += 115 - sst.FRShdr;         // shoulder (- is left)
+    } else if (leg == 1)               //Rear Right
+    {
+        alpha += 90 + sst.RRElbow;         //elbow (+ is up)
+        beta = 115 - beta + sst.RRFoot;    //foot (+ is up)
+        gamma = 115 - gamma + sst.RRShdr;  // shoulder (+ is left)
+    } else if (leg == 2)               //Front Left
+    {
+        alpha += 75 + sst.FLElbow;         //elbow (+ is up)
+        beta = 140 - beta + sst.FLFoot;    //foot (+ is up)
+        gamma = 115 - gamma + sst.FLShdr;  // shoulder (+ is left)
+    } else if (leg == 3)               // Rear Left
+    {
+        alpha = 90 - alpha - sst.RLElbow;  //elbow (- is up)
+        beta = beta + 50 - sst.RLFoot;     //foot; (- is up)
+        gamma += 100 - sst.RLShdr;         // shoulder (- is left)
+    }
+
+    int AL = ((850 / 180) * alpha);
+    if (AL > 580) AL = 580;
+    if (AL < 125) AL = 125;
+    print_final_PWM(servo_pin[leg][0], AL);
+    pwm.setPWM(servo_pin[leg][0], 0, AL);
+    int BE = ((850 / 180) * beta);
+    if (BE > 580) BE = 580;
+    if (BE < 125) BE = 125;
+    print_final_PWM(servo_pin[leg][1], BE);
+    pwm.setPWM(servo_pin[leg][1], 0, BE);
+    int GA = ((580 / 180) * gamma);
+    if (GA > 580) GA = 580;
+    if (GA < 125) GA = 125;
+    print_final_PWM(servo_pin[leg][2], GA);
+    pwm.setPWM(servo_pin[leg][2], 0, GA);
+}
+
 SemaphoreHandle_t Semaphore;
 
 void servo_service(void * data) {
@@ -919,7 +945,7 @@ void servo_service(void * data) {
         // Serial.printf("%05lu counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter++);
         
 #ifdef TIMER_INTERRUPT_DEBUG
-        Serial.printf("[OUT]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
+        // Serial.printf("[OUT]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
 #endif
     }
 }
@@ -969,14 +995,15 @@ void servos_init() {
     delay(100);
 
     //initialize servos
-    // servos_start();
+    servos_start();
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
 }
 
 void servos_start() {
-    sit();
-    b_init();
+    // sit();
+    // b_init();
+    // stand();
 }
 
 void commRead() {
@@ -1004,10 +1031,11 @@ void servos_loop() {
         turn_right(1);
     }
 
-    // Serial.printf("[LP]\tFL:%i\tFR:%i\tRL:%i\tx:%f\ty:%f\tz:%f\n",sst.FLShdr,sst.FRShdr,sst.RLShdr,sst.site_now[0][0], sst.site_now[0][1], sst.site_now[0][2]);
-
     Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
+
 #ifdef TIMER_INTERRUPT_DEBUG
+    // Serial.printf("[LP]\tFL:%i\tFR:%i\tRL:%i\tx:%f\ty:%f\tz:%f\n",sst.FLShdr,sst.FRShdr,sst.RLShdr,sst.site_now[0][0], sst.site_now[0][1], sst.site_now[0][2]);
+    Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
 #endif
 
     // servo_service();
