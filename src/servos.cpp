@@ -918,7 +918,7 @@ void polar_to_servo(int leg, float alpha, float beta, float gamma) {
 
 SemaphoreHandle_t Semaphore;
 
-void servo_service(void * data) {
+void servos_service(void * data) {
     // service_status_t sst = *(service_status_t *)data;
     for (;;) {
         float alpha, beta, gamma;
@@ -930,22 +930,16 @@ void servo_service(void * data) {
                 else
                     sst.site_now[i][j] = sst.site_expect[i][j];
             }
-#ifdef TIMER_INTERRUPT_DEBUG
-            // Serial.printf("[IN ]\tA:%f\tB:%f\tG:%f\tx:%f\ty:%f\tz:%f\n",alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
-#endif            
             cartesian_to_polar(alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
-#ifdef TIMER_INTERRUPT_DEBUG
-            // Serial.printf("[PIN]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
-#endif            
             polar_to_servo(i, alpha, beta, gamma);
         }
         sst.rest_counter++;
         xSemaphoreGive(Semaphore);
         vTaskDelay(20 / portTICK_PERIOD_MS);
-        // Serial.printf("%05lu counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter++);
         
 #ifdef TIMER_INTERRUPT_DEBUG
-        // Serial.printf("[OUT]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
+        Serial.printf("%05lu counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
+        Serial.printf("[OUT]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
 #endif
     }
 }
@@ -984,15 +978,13 @@ void servos_init() {
 	Semaphore = xSemaphoreCreateMutex();
 
     xTaskCreatePinnedToCore(
-        servo_service,   // Function that should be called
+        servos_service,   // Function that should be called
         "ServoService",  // Name of the task (for debugging)
         100000,          // Stack size (bytes)
         (void *)&sst,    // Parameter to pass
         1,               // Task priority
         &Task0,          // Task handle
         1);
-
-    delay(100);
 
     //initialize servos
     servos_start();
@@ -1001,9 +993,8 @@ void servos_init() {
 }
 
 void servos_start() {
-    // sit();
-    // b_init();
-    // stand();
+    sit();
+    b_init();
 }
 
 void commRead() {
@@ -1031,16 +1022,11 @@ void servos_loop() {
         turn_right(1);
     }
 
-    Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
-
 #ifdef TIMER_INTERRUPT_DEBUG
-    // Serial.printf("[LP]\tFL:%i\tFR:%i\tRL:%i\tx:%f\ty:%f\tz:%f\n",sst.FLShdr,sst.FRShdr,sst.RLShdr,sst.site_now[0][0], sst.site_now[0][1], sst.site_now[0][2]);
     Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
 #endif
 
-    // servo_service();
-    // Serial.println(rest_counter);
-    // turn_right(40); //test
     delay(100);
+
 }
 

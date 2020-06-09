@@ -59,8 +59,13 @@ void loop() {
     //     servos_cmd(7,1);
     // }
 
-    if(action++==50) {
-        servos_cmd(1,2);
-    }
+    // if(action++==30) {
+    //     Serial.println("Shake");
+    //     servos_cmd(5,3);
+    // }
 
+    // if(action++==30) {
+    //     Serial.println("Forward");
+    //     servos_cmd(1,2);
+    // }
 }
