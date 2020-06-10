@@ -1026,7 +1026,6 @@ void servos_loop() {
     Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
 #endif
 
-    delay(100);
-
+    // delay(100);
 }
 
