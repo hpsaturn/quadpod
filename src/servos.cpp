@@ -1,8 +1,14 @@
 #include <servos.hpp>
 
+#ifdef ENABLE_BLUETOOTH
 SerialCommand SCmd;  // The demo SerialCommand object
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 BluetoothSerial btSerial; //Object for Bluetooth
+#endif
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
+
+#define MIN_PULSE_WIDTH 600
+#define MAX_PULSE_WIDTH 2600
+#define FREQUENCY 50
 
 
 /* Servos --------------------------------------------------------------------*/
@@ -23,16 +29,33 @@ const float x_default = 62, x_offset = 0;
 const float y_start = 0, y_step = 40;
 const float y_default = x_default;
 /* variables for movement ----------------------------------------------------*/
-volatile float site_now[4][3];     //real-time coordinates of the end of each leg
-volatile float site_expect[4][3];  //expected coordinates of the end of each leg
-float temp_speed[4][3];            //each axis' speed, needs to be recalculated before each movement
+typedef struct {
+    float site_now[4][3];     //real-time coordinates of the end of each leg
+    float site_expect[4][3];  //expected coordinates of the end of each leg
+    float temp_speed[4][3];   //each axis' speed, needs to be recalculated before each movement
+    int FRFoot = 0;
+    int FRElbow = 0;
+    int FRShdr = 0;
+    int FLFoot = 0;
+    int FLElbow = 0;
+    int FLShdr = 0;
+    int RRFoot = 0;
+    int RRElbow = 0;
+    int RRShdr = 0;
+    int RLFoot = 0;
+    int RLElbow = 0;
+    int RLShdr = 0;
+    uint32_t rest_counter = 0;  //+1/0.02s, for automatic rest
+} service_status_t;
+
+service_status_t sst;
+
 float move_speed = 1.4;            //movement speed
 float speed_multiple = 1;          //movement speed multiple
 const float spot_turn_speed = 4;
 const float leg_move_speed = 8;
 const float body_move_speed = 3;
 const float stand_seat_speed = 1;
-volatile int rest_counter;  //+1/0.02s, for automatic rest
 //functions' parameter
 const float KEEP = 255;
 //define PI for calculation
@@ -51,30 +74,30 @@ const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
 /* ---------------------------------------------------------------------------*/
 boolean Demo_mode = true;
 String lastComm = "";
-
-int FRFoot = 0;
-int FRElbow = 0;
-int FRShdr = 0;
-int FLFoot = 0;
-int FLElbow = 0;
-int FLShdr = 0;
-int RRFoot = 0;
-int RRElbow = 0;
-int RRShdr = 0;
-int RLFoot = 0;
-int RLElbow = 0;
-int RLShdr = 0;
-
+boolean print_reach = false;
 /*
   - wait one of end points move to expect site
   - blocking function
    ---------------------------------------------------------------------------*/
 void wait_reach(int leg) {
-    while (1)
-        if (site_now[leg][0] == site_expect[leg][0])
-            if (site_now[leg][1] == site_expect[leg][1])
-                if (site_now[leg][2] == site_expect[leg][2])
+    while (1){
+        if(print_reach){
+            Serial.printf("%i now:%f exp:%f\n", leg, sst.site_now[leg][0], sst.site_expect[leg][0]);
+            Serial.printf("%i now:%f exp:%f\n", leg, sst.site_now[leg][1], sst.site_expect[leg][1]);
+            Serial.printf("%i now:%f exp:%f\n", leg, sst.site_now[leg][2], sst.site_expect[leg][2]);
+        }
+        // Serial.println("now vs expect in leg: "+ String(leg));
+        if (sst.site_now[leg][0] == sst.site_expect[leg][0]){
+            // Serial.println("0-> true");
+            if (sst.site_now[leg][1] == sst.site_expect[leg][1]){
+                // Serial.println("1-> true");
+                if (sst.site_now[leg][2] == sst.site_expect[leg][2]){
+                    // Serial.println("2-> true");
                     break;
+                }
+            }
+        }
+    }
 }
 
 /*
@@ -107,31 +130,31 @@ void set_site(int leg, float x, float y, float z) {
     float length_x = 0, length_y = 0, length_z = 0;
 
     if (x != KEEP)
-        length_x = x - site_now[leg][0];
+        length_x = x - sst.site_now[leg][0];
     if (y != KEEP)
-        length_y = y - site_now[leg][1];
+        length_y = y - sst.site_now[leg][1];
     if (z != KEEP)
-        length_z = z - site_now[leg][2];
+        length_z = z - sst.site_now[leg][2];
 
     float length = sqrt(pow(length_x, 2) + pow(length_y, 2) + pow(length_z, 2));
 
-    temp_speed[leg][0] = length_x / length * move_speed * speed_multiple;
-    temp_speed[leg][1] = length_y / length * move_speed * speed_multiple;
-    temp_speed[leg][2] = length_z / length * move_speed * speed_multiple;
+    sst.temp_speed[leg][0] = length_x / length * move_speed * speed_multiple;
+    sst.temp_speed[leg][1] = length_y / length * move_speed * speed_multiple;
+    sst.temp_speed[leg][2] = length_z / length * move_speed * speed_multiple;
 
     if (x != KEEP)
-        site_expect[leg][0] = x;
+        sst.site_expect[leg][0] = x;
     if (y != KEEP)
-        site_expect[leg][1] = y;
+        sst.site_expect[leg][1] = y;
     if (z != KEEP)
-        site_expect[leg][2] = z;
+        sst.site_expect[leg][2] = z;
 }
 
 /*
   - is_stand
    ---------------------------------------------------------------------------*/
 bool is_stand(void) {
-    if (site_now[0][2] == z_default)
+    if (sst.site_now[0][2] == z_default)
         return true;
     else
         return false;
@@ -182,7 +205,7 @@ void b_init(void) {
 void turn_left(unsigned int step) {
     move_speed = spot_turn_speed;
     while (step-- > 0) {
-        if (site_now[3][1] == y_start) {
+        if (sst.site_now[3][1] == y_start) {
             //leg 3&1 move
             set_site(3, x_default + x_offset, y_start, z_up);
             wait_all_reach();
@@ -256,7 +279,7 @@ void turn_left(unsigned int step) {
 void turn_right(unsigned int step) {
     move_speed = spot_turn_speed;
     while (step-- > 0) {
-        if (site_now[2][1] == y_start) {
+        if (sst.site_now[2][1] == y_start) {
             //leg 2&0 move
             set_site(2, x_default + x_offset, y_start, z_up);
             wait_all_reach();
@@ -330,7 +353,7 @@ void turn_right(unsigned int step) {
 void step_forward(unsigned int step) {
     move_speed = leg_move_speed;
     while (step-- > 0) {
-        if (site_now[2][1] == y_start) {
+        if (sst.site_now[2][1] == y_start) {
             //leg 2&1 move
             set_site(2, x_default + x_offset, y_start, z_up);
             wait_all_reach();
@@ -392,7 +415,7 @@ void step_forward(unsigned int step) {
 void step_back(unsigned int step) {
     move_speed = leg_move_speed;
     while (step-- > 0) {
-        if (site_now[3][1] == y_start) {
+        if (sst.site_now[3][1] == y_start) {
             //leg 3&0 move
             set_site(3, x_default + x_offset, y_start, z_up);
             wait_all_reach();
@@ -449,18 +472,18 @@ void step_back(unsigned int step) {
 // add by RegisHsu
 
 void body_left(int i) {
-    set_site(0, site_now[0][0] + i, KEEP, KEEP);
-    set_site(1, site_now[1][0] + i, KEEP, KEEP);
-    set_site(2, site_now[2][0] - i, KEEP, KEEP);
-    set_site(3, site_now[3][0] - i, KEEP, KEEP);
+    set_site(0, sst.site_now[0][0] + i, KEEP, KEEP);
+    set_site(1, sst.site_now[1][0] + i, KEEP, KEEP);
+    set_site(2, sst.site_now[2][0] - i, KEEP, KEEP);
+    set_site(3, sst.site_now[3][0] - i, KEEP, KEEP);
     wait_all_reach();
 }
 
 void body_right(int i) {
-    set_site(0, site_now[0][0] - i, KEEP, KEEP);
-    set_site(1, site_now[1][0] - i, KEEP, KEEP);
-    set_site(2, site_now[2][0] + i, KEEP, KEEP);
-    set_site(3, site_now[3][0] + i, KEEP, KEEP);
+    set_site(0, sst.site_now[0][0] - i, KEEP, KEEP);
+    set_site(1, sst.site_now[1][0] - i, KEEP, KEEP);
+    set_site(2, sst.site_now[2][0] + i, KEEP, KEEP);
+    set_site(3, sst.site_now[3][0] + i, KEEP, KEEP);
     wait_all_reach();
 }
 
@@ -469,11 +492,11 @@ void hand_wave(int i) {
     float y_tmp;
     float z_tmp;
     move_speed = 1;
-    if (site_now[3][1] == y_start) {
+    if (sst.site_now[3][1] == y_start) {
         body_right(15);
-        x_tmp = site_now[2][0];
-        y_tmp = site_now[2][1];
-        z_tmp = site_now[2][2];
+        x_tmp = sst.site_now[2][0];
+        y_tmp = sst.site_now[2][1];
+        z_tmp = sst.site_now[2][2];
         move_speed = body_move_speed;
         for (int j = 0; j < i; j++) {
             set_site(2, turn_x1, turn_y1, 50);
@@ -487,9 +510,9 @@ void hand_wave(int i) {
         body_left(15);
     } else {
         body_left(15);
-        x_tmp = site_now[0][0];
-        y_tmp = site_now[0][1];
-        z_tmp = site_now[0][2];
+        x_tmp = sst.site_now[0][0];
+        y_tmp = sst.site_now[0][1];
+        z_tmp = sst.site_now[0][2];
         move_speed = body_move_speed;
         for (int j = 0; j < i; j++) {
             set_site(0, turn_x1, turn_y1, 50);
@@ -509,11 +532,11 @@ void hand_shake(int i) {
     float y_tmp;
     float z_tmp;
     move_speed = 1;
-    if (site_now[3][1] == y_start) {
+    if (sst.site_now[3][1] == y_start) {
         body_right(15);
-        x_tmp = site_now[2][0];
-        y_tmp = site_now[2][1];
-        z_tmp = site_now[2][2];
+        x_tmp = sst.site_now[2][0];
+        y_tmp = sst.site_now[2][1];
+        z_tmp = sst.site_now[2][2];
         move_speed = body_move_speed;
         for (int j = 0; j < i; j++) {
             set_site(2, x_default - 30, y_start + 2 * y_step, 55);
@@ -527,9 +550,9 @@ void hand_shake(int i) {
         body_left(15);
     } else {
         body_left(15);
-        x_tmp = site_now[0][0];
-        y_tmp = site_now[0][1];
-        z_tmp = site_now[0][2];
+        x_tmp = sst.site_now[0][0];
+        y_tmp = sst.site_now[0][1];
+        z_tmp = sst.site_now[0][2];
         move_speed = body_move_speed;
         for (int j = 0; j < i; j++) {
             set_site(0, x_default - 30, y_start + 2 * y_step, 55);
@@ -545,25 +568,22 @@ void hand_shake(int i) {
 }
 
 void head_up(int i) {
-    set_site(0, KEEP, KEEP, site_now[0][2] - i);
-    set_site(1, KEEP, KEEP, site_now[1][2] + i);
-    set_site(2, KEEP, KEEP, site_now[2][2] - i);
-    set_site(3, KEEP, KEEP, site_now[3][2] + i);
+    set_site(0, KEEP, KEEP, sst.site_now[0][2] - i);
+    set_site(1, KEEP, KEEP, sst.site_now[1][2] + i);
+    set_site(2, KEEP, KEEP, sst.site_now[2][2] - i);
+    set_site(3, KEEP, KEEP, sst.site_now[3][2] + i);
     wait_all_reach();
 }
 
 void head_down(int i) {
-    set_site(0, KEEP, KEEP, site_now[0][2] + i);
-    set_site(1, KEEP, KEEP, site_now[1][2] - i);
-    set_site(2, KEEP, KEEP, site_now[2][2] + i);
-    set_site(3, KEEP, KEEP, site_now[3][2] - i);
+    set_site(0, KEEP, KEEP, sst.site_now[0][2] + i);
+    set_site(1, KEEP, KEEP, sst.site_now[1][2] - i);
+    set_site(2, KEEP, KEEP, sst.site_now[2][2] + i);
+    set_site(3, KEEP, KEEP, sst.site_now[3][2] - i);
     wait_all_reach();
 }
 
 void body_dance(int i) {
-    float x_tmp;
-    float y_tmp;
-    float z_tmp;
     float body_dance_speed = 2;
     sit();
     move_speed = 1;
@@ -571,6 +591,8 @@ void body_dance(int i) {
     set_site(1, x_default, y_default, KEEP);
     set_site(2, x_default, y_default, KEEP);
     set_site(3, x_default, y_default, KEEP);
+    Serial.println("mark");
+    print_reach = true;
     wait_all_reach();
     stand();
     set_site(0, x_default, y_default, z_default - 20);
@@ -601,73 +623,12 @@ void body_dance(int i) {
     b_init();
 }
 
-/*
-  - trans site from cartesian to polar
-  - mathematical model 2/2
-   ---------------------------------------------------------------------------*/
-void cartesian_to_polar(volatile float &alpha, volatile float &beta, volatile float &gamma, volatile float x, volatile float y, volatile float z) {
-    //calculate w-z degree
-    float v, w;
-    w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
-    v = w - length_c;
-    alpha = atan2(z, v) + acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) / 2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
-    beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) / 2 / length_a / length_b);
-    //calculate x-y-z degree
-    gamma = (w >= 0) ? atan2(y, x) : atan2(-y, -x);
-    //trans degree pi->180
-    alpha = alpha / pi * 180;
-    beta = beta / pi * 180;
-    gamma = gamma / pi * 180;
-}
-
-/*
-  - trans site from polar to microservos
-  - mathematical model map to fact
-  - the errors saved in eeprom will be add
-   ---------------------------------------------------------------------------*/
-void polar_to_servo(int leg, float alpha, float beta, float gamma) {
-    if (leg == 0)  //Front Right
-    {
-        alpha = 85 - alpha - FRElbow;  //elbow (- is up)
-        beta = beta + 40 - FRFoot;     //foot (- is up)
-        gamma += 115 - FRShdr;         // shoulder (- is left)
-    } else if (leg == 1)               //Rear Right
-    {
-        alpha += 90 + RRElbow;         //elbow (+ is up)
-        beta = 115 - beta + RRFoot;    //foot (+ is up)
-        gamma = 115 - gamma + RRShdr;  // shoulder (+ is left)
-    } else if (leg == 2)               //Front Left
-    {
-        alpha += 75 + FLElbow;         //elbow (+ is up)
-        beta = 140 - beta + FLFoot;    //foot (+ is up)
-        gamma = 115 - gamma + FLShdr;  // shoulder (+ is left)
-    } else if (leg == 3)               // Rear Left
-    {
-        alpha = 90 - alpha - RLElbow;  //elbow (- is up)
-        beta = beta + 50 - RLFoot;     //foot; (- is up)
-        gamma += 100 - RLShdr;         // shoulder (- is left)
-    }
-    int AL = ((850 / 180) * alpha);
-    if (AL > 580) AL = 580;
-    if (AL < 125) AL = 125;
-    pwm.setPWM(servo_pin[leg][0], 0, AL);
-    int BE = ((850 / 180) * beta);
-    if (BE > 580) BE = 580;
-    if (BE < 125) BE = 125;
-    pwm.setPWM(servo_pin[leg][1], 0, BE);
-    int GA = ((580 / 180) * gamma);
-    if (GA > 580) GA = 580;
-    if (GA < 125) GA = 125;
-    pwm.setPWM(servo_pin[leg][2], 0, GA);
-}
-
-
-
 // This gets set as the default handler, and gets called when no other command matches.
 void unrecognized(const char *command) {
     Serial.println("What?");
 }
 
+#ifdef ENABLE_BLUETOOTH
 void action_cmd (void) {
     char *arg;
     int action_mode, n_step;
@@ -677,6 +638,7 @@ void action_cmd (void) {
     n_step = atoi(arg);
     servos_cmd (action_mode, n_step);
 }
+#endif
 
 void servos_cmd(int action_mode, int n_step) {
     Serial.println("Action:");
@@ -745,98 +707,98 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_SET:
             Serial.println("Higher");
-            FLElbow = 0;
-            FRElbow = 0;
-            RLElbow = 0;
-            RRElbow = 0;
-            FLFoot = 0;
-            FRFoot = 0;
-            RLFoot = 0;
-            RRFoot = 0;
-            FLShdr = 0;
-            FRShdr = 0;
-            RLShdr = 0;
-            RRShdr = 0;
+            sst.FLElbow = 0;
+            sst.FRElbow = 0;
+            sst.RLElbow = 0;
+            sst.RRElbow = 0;
+            sst.FLFoot = 0;
+            sst.FRFoot = 0;
+            sst.RLFoot = 0;
+            sst.RRFoot = 0;
+            sst.FLShdr = 0;
+            sst.FRShdr = 0;
+            sst.RLShdr = 0;
+            sst.RRShdr = 0;
             stand();
             break;
 
         case W_HIGHER:
             Serial.println("Higher");
-            FLElbow -= 4;
-            FRElbow -= 4;
-            RLElbow -= 4;
-            RRElbow -= 4;
-            FLFoot += 4;
-            FRFoot += 4;
-            RLFoot += 4;
-            RRFoot += 4;
+            sst.FLElbow -= 4;
+            sst.FRElbow -= 4;
+            sst.RLElbow -= 4;
+            sst.RRElbow -= 4;
+            sst.FLFoot += 4;
+            sst.FRFoot += 4;
+            sst.RLFoot += 4;
+            sst.RRFoot += 4;
             stand();
             break;
 
         case W_LOWER:
             Serial.println("Lower");
-            FLElbow += 4;
-            FRElbow += 4;
-            RLElbow += 4;
-            RRElbow += 4;
-            FLFoot -= 4;
-            FRFoot -= 4;
-            RLFoot -= 4;
-            RRFoot -= 4;
+            sst.FLElbow += 4;
+            sst.FRElbow += 4;
+            sst.RLElbow += 4;
+            sst.RRElbow += 4;
+            sst.FLFoot -= 4;
+            sst.FRFoot -= 4;
+            sst.RLFoot -= 4;
+            sst.RRFoot -= 4;
             stand();
             break;
 
         case W_HEAD_UP:
             Serial.println("Head up");
-            FLElbow -= 4;
-            FRElbow -= 4;
-            RLElbow += 4;
-            RRElbow += 4;
-            FLFoot += 4;
-            FRFoot += 4;
-            RLFoot -= 4;
-            RRFoot -= 4;
+            sst.FLElbow -= 4;
+            sst.FRElbow -= 4;
+            sst.RLElbow += 4;
+            sst.RRElbow += 4;
+            sst.FLFoot += 4;
+            sst.FRFoot += 4;
+            sst.RLFoot -= 4;
+            sst.RRFoot -= 4;
             stand();
             break;
 
         case W_HEAD_DOWN:
             Serial.println("Head down");
-            FLElbow += 4;
-            FRElbow += 4;
-            RLElbow -= 4;
-            RRElbow -= 4;
-            FLFoot -= 4;
-            FRFoot -= 4;
-            RLFoot += 4;
-            RRFoot += 4;
+            sst.FLElbow += 4;
+            sst.FRElbow += 4;
+            sst.RLElbow -= 4;
+            sst.RRElbow -= 4;
+            sst.FLFoot -= 4;
+            sst.FRFoot -= 4;
+            sst.RLFoot += 4;
+            sst.RRFoot += 4;
             stand();
             break;
 
         case W_B_RIGHT:
             Serial.println("body right");
             if (!is_stand()) stand();
-            FLElbow -= 4;
-            FRElbow += 4;
-            RLElbow -= 4;
-            RRElbow += 4;
-            FLFoot += 4;
-            FRFoot -= 4;
-            RLFoot += 4;
-            RRFoot -= 4;
+            sst.FLElbow -= 4;
+            sst.FRElbow += 4;
+            sst.RLElbow -= 4;
+            sst.RRElbow += 4;
+            sst.FLFoot += 4;
+            sst.FRFoot -= 4;
+            sst.RLFoot += 4;
+            sst.RRFoot -= 4;
             stand();
             break;
 
         case W_B_LEFT:
             Serial.println("body left");
             if (!is_stand()) stand();
-            FLElbow += 4;
-            FRElbow -= 4;
-            RLElbow += 4;
-            RRElbow -= 4;
-            FLFoot -= 4;
-            FRFoot += 4;
-            RLFoot -= 4;
-            RRFoot += 4;
+            sst.FLElbow += 4;
+            sst.FRElbow -= 4;
+            sst.RLElbow += 4;
+            sst.RRElbow -= 4;
+            sst.FLFoot -= 4;
+            sst.FRFoot += 4;
+            sst.RLFoot -= 4;
+            sst.RRFoot += 4;
             stand();
             break;
 
@@ -845,36 +807,36 @@ void servos_cmd(int action_mode, int n_step) {
             lastComm = "";
             sit();
             b_init();
-            FLElbow = 0;
-            FRElbow = 0;
-            RLElbow = 0;
-            RRElbow = 0;
-            FLFoot = 0;
-            FRFoot = 0;
-            RLFoot = 0;
-            RRFoot = 0;
-            FLShdr = 0;
-            FRShdr = 0;
-            RLShdr = 0;
-            RRShdr = 0;
+            sst.FLElbow = 0;
+            sst.FRElbow = 0;
+            sst.RLElbow = 0;
+            sst.RRElbow = 0;
+            sst.FLFoot = 0;
+            sst.FRFoot = 0;
+            sst.RLFoot = 0;
+            sst.RRFoot = 0;
+            sst.FLShdr = 0;
+            sst.FRShdr = 0;
+            sst.RLShdr = 0;
+            sst.RRShdr = 0;
             stand();
             break;
 
         case W_TW_R:
             Serial.println("Body twist right");
-            FLShdr -= 4;
-            FRShdr += 4;
-            RLShdr += 4;
-            RRShdr -= 4;
+            sst.FLShdr -= 4;
+            sst.FRShdr += 4;
+            sst.RLShdr += 4;
+            sst.RRShdr -= 4;
             stand();
             break;
 
         case W_TW_L:
             Serial.println("Body twist left");
-            FLShdr += 4;
-            FRShdr -= 4;
-            RLShdr -= 4;
-            RRShdr += 4;
+            sst.FLShdr += 4;
+            sst.FRShdr -= 4;
+            sst.RLShdr -= 4;
+            sst.RRShdr += 4;
             stand();
             break;
 
@@ -884,87 +846,166 @@ void servos_cmd(int action_mode, int n_step) {
     }
 }
 
-void commRead() {
-    SCmd.readSerial(btSerial);
+/*
+  - trans site from cartesian to polar
+  - mathematical model 2/2
+   ---------------------------------------------------------------------------*/
+void cartesian_to_polar(float &alpha, float &beta, float &gamma, float x, float y, float z) {
+    //calculate w-z degree
+    float v, w;
+    w = (x >= 0 ? 1 : -1) * (sqrt(pow(x, 2) + pow(y, 2)));
+    v = w - length_c;
+    alpha = atan2(z, v) + acos((pow(length_a, 2) - pow(length_b, 2) + pow(v, 2) + pow(z, 2)) / 2 / length_a / sqrt(pow(v, 2) + pow(z, 2)));
+    beta = acos((pow(length_a, 2) + pow(length_b, 2) - pow(v, 2) - pow(z, 2)) / 2 / length_a / length_b);
+    //calculate x-y-z degree
+    gamma = (w >= 0) ? atan2(y, x) : atan2(-y, -x);
+    //trans degree pi->180
+    alpha = alpha / pi * 180.0;
+    beta = beta / pi * 180.0;
+    gamma = gamma / pi * 180.0;
 }
 
-String getLastComm() {
-    return lastComm;
+void print_final_PWM (int pin, uint16_t off){
+#ifdef TIMER_INTERRUPT_DEBUG
+    Serial.printf("[PWM]\tP:%i\toff:%u\n",pin,off);
+#endif
 }
-
-#define TIMER0_INTERVAL_MS        1000
-
-// Init ESP32 timer 0
-ESP32Timer ITimer0(0);
 
 /*
-  - microservos service /timer interrupt function/50Hz
-  - when set site expected,this function move the end point to it in a straight line
-  - temp_speed[4][3] should be set before set expect site,it make sure the end point
-   move in a straight line,and decide move speed.
+  - trans site from polar to microservos
+  - mathematical model map to fact
+  - the errors saved in eeprom will be add
    ---------------------------------------------------------------------------*/
-void IRAM_ATTR servo_service(void) {
-    sei();
-    static float alpha, beta, gamma;
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 3; j++) {
-            if (abs(site_now[i][j] - site_expect[i][j]) >= abs(temp_speed[i][j]))
-                site_now[i][j] += temp_speed[i][j];
-            else
-                site_now[i][j] = site_expect[i][j];
-        }
-
-        cartesian_to_polar(alpha, beta, gamma, site_now[i][0], site_now[i][1], site_now[i][2]);
-        polar_to_servo(i, alpha, beta, gamma);
+void polar_to_servo(int leg, float alpha, float beta, float gamma) {
+    if (leg == 0)  //Front Right
+    {
+        alpha = 85 - alpha - sst.FRElbow;  //elbow (- is up)
+        beta = beta + 40 - sst.FRFoot;     //foot (- is up)
+        gamma += 115 - sst.FRShdr;         // shoulder (- is left)
+    } else if (leg == 1)               //Rear Right
+    {
+        alpha += 90 + sst.RRElbow;         //elbow (+ is up)
+        beta = 115 - beta + sst.RRFoot;    //foot (+ is up)
+        gamma = 115 - gamma + sst.RRShdr;  // shoulder (+ is left)
+    } else if (leg == 2)               //Front Left
+    {
+        alpha += 75 + sst.FLElbow;         //elbow (+ is up)
+        beta = 140 - beta + sst.FLFoot;    //foot (+ is up)
+        gamma = 115 - gamma + sst.FLShdr;  // shoulder (+ is left)
+    } else if (leg == 3)               // Rear Left
+    {
+        alpha = 90 - alpha - sst.RLElbow;  //elbow (- is up)
+        beta = beta + 50 - sst.RLFoot;     //foot; (- is up)
+        gamma += 100 - sst.RLShdr;         // shoulder (- is left)
     }
 
-#if (TIMER_INTERRUPT_DEBUG > 0)
-    Serial.println("ITimer0: millis() = " + String(millis()));
-#endif
-
-  rest_counter++;
+    int AL = ((850 / 180) * alpha);
+    if (AL > 580) AL = 580;
+    if (AL < 125) AL = 125;
+    print_final_PWM(servo_pin[leg][0], AL);
+    pwm.setPWM(servo_pin[leg][0], 0, AL);
+    int BE = ((850 / 180) * beta);
+    if (BE > 580) BE = 580;
+    if (BE < 125) BE = 125;
+    print_final_PWM(servo_pin[leg][1], BE);
+    pwm.setPWM(servo_pin[leg][1], 0, BE);
+    int GA = ((580 / 180) * gamma);
+    if (GA > 580) GA = 580;
+    if (GA < 125) GA = 125;
+    print_final_PWM(servo_pin[leg][2], GA);
+    pwm.setPWM(servo_pin[leg][2], 0, GA);
 }
 
+SemaphoreHandle_t Semaphore;
+
+void servos_service(void * data) {
+    // service_status_t sst = *(service_status_t *)data;
+    for (;;) {
+        float alpha, beta, gamma;
+        xSemaphoreTake(Semaphore, portMAX_DELAY);
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (abs(sst.site_now[i][j] - sst.site_expect[i][j]) >= abs(sst.temp_speed[i][j]))
+                    sst.site_now[i][j] += sst.temp_speed[i][j];
+                else
+                    sst.site_now[i][j] = sst.site_expect[i][j];
+            }
+            cartesian_to_polar(alpha, beta, gamma, sst.site_now[i][0], sst.site_now[i][1], sst.site_now[i][2]);
+            polar_to_servo(i, alpha, beta, gamma);
+        }
+        sst.rest_counter++;
+        xSemaphoreGive(Semaphore);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
+        
+#ifdef TIMER_INTERRUPT_DEBUG
+        Serial.printf("%05lu counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
+        Serial.printf("[OUT]\tA:%f\tB:%f\tG:%f\n",alpha, beta, gamma);
+#endif
+    }
+}
+
+TaskHandle_t Task0;
+
 void servos_init() {
+    Serial.println("Starting PWM Library..");
     Wire.begin(SDA_PIN,SCL_PIN);
     pwm.begin();
-    pwm.setOscillatorFrequency(27000000);
-    pwm.setPWMFreq(50);  // Analog servos run at ~60 Hz updates
-    Serial.println("PMW Servo ready");
+    pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
 
+#ifdef ENABLE_BLUETOOTH
     SCmd.addCommand("w", action_cmd);
     SCmd.setDefaultHandler(unrecognized);
+    btSerial.begin("QuadPod");
+    Serial.println("BT Serial ready");
+#endif
 
     //initialize default parameter
+    Serial.println("Default parameters:");
     set_site(0, x_default - x_offset, y_start + y_step, z_boot);
     set_site(1, x_default - x_offset, y_start + y_step, z_boot);
     set_site(2, x_default + x_offset, y_start, z_boot);
     set_site(3, x_default + x_offset, y_start, z_boot);
+    Serial.printf("X:%f\tY:%f\tZ:%f\n",x_default,y_start,z_boot);
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
-            site_now[i][j] = site_expect[i][j];
+            sst.site_now[i][j] = sst.site_expect[i][j];
+            Serial.printf("site_now:%f\n",sst.site_now[i][j]);
         }
     }
-    //start servo service
-    // FlexiTimer2::set(20, servo_service);
-    // FlexiTimer2::start();
-    // Serial.println("Servo service started");
+    Serial.println("Starting servos service..");
 
-    btSerial.begin("QuadPod");
-    Serial.println("BT Serial ready");
+    // Simple flag, up or down
+	Semaphore = xSemaphoreCreateMutex();
 
-    // initialize servos
-    if (ITimer0.attachInterruptInterval(TIMER0_INTERVAL_MS * 1000, servo_service))
-        Serial.println("Starting  ITimer0 OK, millis() = " + String(millis()));
-    else
-        Serial.println("Can't set ITimer0. Select another freq. or timer");
+    xTaskCreatePinnedToCore(
+        servos_service,   // Function that should be called
+        "ServoService",  // Name of the task (for debugging)
+        100000,          // Stack size (bytes)
+        (void *)&sst,    // Parameter to pass
+        1,               // Task priority
+        &Task0,          // Task handle
+        1);
+
+    //initialize servos
+    servos_start();
 
     Serial.println("Servos initialized");
     Serial.println("Robot initialization Complete");
+}
 
-    // sit();
-    // b_init();
+void servos_start() {
+    sit();
+    b_init();
+}
+
+void commRead() {
+#ifdef ENABLE_BLUETOOTH
+    SCmd.readSerial(btSerial);
+#endif
+}
+
+String getLastComm() {
+    return lastComm;
 }
 
 void servos_loop() {
@@ -981,8 +1022,11 @@ void servos_loop() {
     if (getLastComm() == "RGT") {
         turn_right(1);
     }
-    // Serial.println(getLastComm());
-    // turn_right(1); //test
-    // servo_service();
+
+#ifdef TIMER_INTERRUPT_DEBUG
+    Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
+#endif
+
+    // delay(100);
 }
 

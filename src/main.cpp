@@ -14,7 +14,6 @@
 
 #include <Arduino.h>
 #include <servos.hpp>
-
 #define LED_BUILTIN 22
 
 int ledPulse = 0;
@@ -22,11 +21,15 @@ int ledPulse = 0;
 void setup() {
     //start serial for debug
     Serial.begin(115200);
+    delay(1000);
     Serial.println("Robot starts initialization");
     pinMode(LED_BUILTIN, OUTPUT);
+    delay(2000);
     servos_init();
     delay(4000); // TODO for give time for possible stop
 }
+
+uint16_t action;
 
 void loop() {
     //-----------led blink status
@@ -41,5 +44,29 @@ void loop() {
     }
     ledPulse++;
     //-------------------
+    // Serial.println("ITimer1: millis() = " + String(millis()));
     servos_loop();
+
+    // if(action++==10000) {
+    //     Serial.println("Start");
+    //     // Serial.println("action 4 1");
+    //     // servos_cmd(4,1);
+    //     servos_start();
+    // }
+
+    // if(action++==30) {
+    //     Serial.println("Dance");
+    //     Serial.println("action 7 1");
+    //     servos_cmd(7,1);
+    // }
+
+    // if(action++==30) {
+    //     Serial.println("Shake");
+    //     servos_cmd(5,3);
+    // }
+
+    if(action++==30) {
+        Serial.println("Forward");
+        servos_cmd(1,2);
+    }
 }

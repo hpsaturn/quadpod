@@ -1,11 +1,13 @@
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
+#ifdef ENABLE_BLUETOOTH
 #include <SerialCommand.h>
 #include <BluetoothSerial.h>
-//These define's must be placed at the beginning before #include "ESP32TimerInterrupt.h"
-#define TIMER_INTERRUPT_DEBUG      0
+#endif
 
-#include "ESP32TimerInterrupt.h"
+#define SDA_PIN 16
+#define SCL_PIN 4
+#define LED_PIN 22
 
 // w 0 2: body init
 // w 0 1: stand
@@ -54,3 +56,4 @@
 void servos_init(void);
 void servos_loop(void);
 void servos_cmd(int action_mode, int n_step);
+void servos_start(void);
