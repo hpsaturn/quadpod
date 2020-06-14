@@ -22,11 +22,10 @@ void setup() {
     //start serial for debug
     Serial.begin(115200);
     delay(1000);
-    Serial.println("Robot starts initialization");
+    Serial.println("===== ROBOT SETUP =====");
     pinMode(LED_BUILTIN, OUTPUT);
-    delay(2000);
     servos_init();
-    delay(4000); // TODO for give time for possible stop
+    Serial.println("===== SETUP END =====");
 }
 
 uint16_t action;
@@ -34,36 +33,18 @@ uint16_t action;
 void loop() {
     //-----------led blink status
     if (ledPulse <= 500) {
-        digitalWrite(LED_BUILTIN, LOW);
-    }
-    if (ledPulse > 1000) {
         digitalWrite(LED_BUILTIN, HIGH);
     }
-    if (ledPulse >= 1500) {
+    if (ledPulse > 1500) {
+        digitalWrite(LED_BUILTIN, LOW);
+    }
+    if (ledPulse >= 2000) {
         ledPulse = 0;
     }
 
     ledPulse++;
 
     servos_loop();
-
-    // if(action++==10000) {
-    //     Serial.println("Start");
-    //     // Serial.println("action 4 1");
-    //     // servos_cmd(4,1);
-    //     servos_start();
-    // }
-
-    // if(action++==30) {
-    //     Serial.println("Dance");
-    //     Serial.println("action 7 1");
-    //     servos_cmd(7,1);
-    // }
-
-    // if(action++==30) {
-    //     Serial.println("Shake");
-    //     servos_cmd(5,3);
-    // }
 
     // if(action++==30) {
     //     Serial.println("Forward");

@@ -962,19 +962,16 @@ void servos_start() {
 TaskHandle_t Task0;
 
 void servos_init() {
-    Serial.println("== Starting Servos ==");
     // Options are: 240 (default), 160, 80, 40, 20 and 10 MHz
     setCpuFrequencyMhz(80);
 	int cpuSpeed = getCpuFrequencyMhz();
 	Serial.println("CPU Running at " + String(cpuSpeed) + "MHz");
-
-    Serial.println("Starting PWM Library..");
+    Serial.println("starting PWM Library..");
     Wire.begin(SDA_PIN,SCL_PIN);
     pwm.begin();
     pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
-
     //initialize default parameter
-    Serial.println("Default parameters:");
+    Serial.println("servo parameters:");
     set_site(0, x_default - x_offset, y_start + y_step, z_boot);
     set_site(1, x_default - x_offset, y_start + y_step, z_boot);
     set_site(2, x_default + x_offset, y_start, z_boot);
@@ -983,12 +980,10 @@ void servos_init() {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
             sst.site_now[i][j] = sst.site_expect[i][j];
-            Serial.printf("site_now:%f\n",sst.site_now[i][j]);
         }
     }
-    Serial.println("Starting servos service..");
-
-    // Simple flag, up or down
+    Serial.println("starting servos service..");
+    // Semafor only for service writing
 	Semaphore = xSemaphoreCreateMutex();
 
     xTaskCreatePinnedToCore(
@@ -1003,7 +998,7 @@ void servos_init() {
 
     //initialize servos
     servos_start();
-    Serial.println("Servos initialized");
+    Serial.println("Servos initialized.");
 
 #ifdef ENABLE_BLUETOOTH
     Serial.println("Starting Bluetooth Library..");
