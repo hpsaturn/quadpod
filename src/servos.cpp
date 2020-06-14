@@ -944,20 +944,34 @@ void servos_service(void * data) {
     }
 }
 
+String getLastComm() {
+    return lastComm;
+}
+
+void commRead() {
+#ifdef ENABLE_BLUETOOTH
+    SCmd.readSerial(btSerial);
+#endif
+}
+
+void servos_start() {
+    sit();
+    b_init();
+}
+
 TaskHandle_t Task0;
 
 void servos_init() {
+    Serial.println("== Starting Servos ==");
+    // Options are: 240 (default), 160, 80, 40, 20 and 10 MHz
+    setCpuFrequencyMhz(80);
+	int cpuSpeed = getCpuFrequencyMhz();
+	Serial.println("CPU Running at " + String(cpuSpeed) + "MHz");
+
     Serial.println("Starting PWM Library..");
     Wire.begin(SDA_PIN,SCL_PIN);
     pwm.begin();
     pwm.setPWMFreq(60);  // Analog servos run at ~60 Hz updates
-
-#ifdef ENABLE_BLUETOOTH
-    SCmd.addCommand("w", action_cmd);
-    SCmd.setDefaultHandler(unrecognized);
-    btSerial.begin("QuadPod");
-    Serial.println("BT Serial ready");
-#endif
 
     //initialize default parameter
     Serial.println("Default parameters:");
@@ -980,32 +994,26 @@ void servos_init() {
     xTaskCreatePinnedToCore(
         servos_service,   // Function that should be called
         "ServoService",  // Name of the task (for debugging)
-        100000,          // Stack size (bytes)
+        10000,          // Stack size (bytes)
         (void *)&sst,    // Parameter to pass
         1,               // Task priority
         &Task0,          // Task handle
-        1);
+        1
+        );
 
     //initialize servos
     servos_start();
-
     Serial.println("Servos initialized");
-    Serial.println("Robot initialization Complete");
-}
 
-void servos_start() {
-    sit();
-    b_init();
-}
-
-void commRead() {
 #ifdef ENABLE_BLUETOOTH
-    SCmd.readSerial(btSerial);
+    Serial.println("Starting Bluetooth Library..");
+    SCmd.addCommand("w", action_cmd);
+    SCmd.setDefaultHandler(unrecognized);
+    btSerial.begin("QuadPod");
+    Serial.println("BT Serial ready");
 #endif
-}
 
-String getLastComm() {
-    return lastComm;
+    Serial.println("Robot initialization Complete");
 }
 
 void servos_loop() {
@@ -1026,7 +1034,6 @@ void servos_loop() {
 #ifdef TIMER_INTERRUPT_DEBUG
     Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
 #endif
-
-    // delay(100);
+    // Serial.printf("[%05lu] last cmd ==> %s\n",(unsigned long)millis(),getLastComm());
 }
 
