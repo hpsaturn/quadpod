@@ -4,16 +4,11 @@
 SerialCommand SCmd;  // The demo SerialCommand object
 BluetoothSerial btSerial; //Object for Bluetooth
 #endif
+
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
-
-#define MIN_PULSE_WIDTH 600
-#define MAX_PULSE_WIDTH 2600
-#define FREQUENCY 50
-
 
 /* Servos --------------------------------------------------------------------*/
 //define 12 servos for 4 legs
-
 //Servo servo[4][3];
 //define servos' ports
 const int servo_pin[4][3] = {{0, 1, 2}, {4, 5, 6}, {8, 9, 10}, {12, 13, 14}};
@@ -33,19 +28,19 @@ typedef struct {
     float site_now[4][3];     //real-time coordinates of the end of each leg
     float site_expect[4][3];  //expected coordinates of the end of each leg
     float temp_speed[4][3];   //each axis' speed, needs to be recalculated before each movement
-    int FRFoot = 0;
-    int FRElbow = 0;
-    int FRShdr = 0;
-    int FLFoot = 0;
-    int FLElbow = 0;
-    int FLShdr = 0;
-    int RRFoot = 0;
-    int RRElbow = 0;
-    int RRShdr = 0;
-    int RLFoot = 0;
-    int RLElbow = 0;
-    int RLShdr = 0;
-    uint32_t rest_counter = 0;  //+1/0.02s, for automatic rest
+    int32_t FRFoot = 0;
+    int32_t FRElbow = 0;
+    int32_t FRShdr = 0;
+    int32_t FLFoot = 0;
+    int32_t FLElbow = 0;
+    int32_t FLShdr = 0;
+    int32_t RRFoot = 0;
+    int32_t RRElbow = 0;
+    int32_t RRShdr = 0;
+    int32_t RLFoot = 0;
+    int32_t RLElbow = 0;
+    int32_t RLShdr = 0;
+    int32_t rest_counter = 0;  //+1/0.02s, for automatic rest
 } service_status_t;
 
 service_status_t sst;
@@ -72,7 +67,6 @@ const float turn_y1 = y_start + y_step / 2;
 const float turn_x0 = turn_x1 - temp_b * cos(temp_alpha);
 const float turn_y0 = temp_b * sin(temp_alpha) - turn_y1 - length_side;
 /* ---------------------------------------------------------------------------*/
-boolean Demo_mode = true;
 String lastComm = "";
 boolean print_reach = false;
 /*
@@ -86,13 +80,9 @@ void wait_reach(int leg) {
             Serial.printf("%i now:%f exp:%f\n", leg, sst.site_now[leg][1], sst.site_expect[leg][1]);
             Serial.printf("%i now:%f exp:%f\n", leg, sst.site_now[leg][2], sst.site_expect[leg][2]);
         }
-        // Serial.println("now vs expect in leg: "+ String(leg));
         if (sst.site_now[leg][0] == sst.site_expect[leg][0]){
-            // Serial.println("0-> true");
             if (sst.site_now[leg][1] == sst.site_expect[leg][1]){
-                // Serial.println("1-> true");
                 if (sst.site_now[leg][2] == sst.site_expect[leg][2]){
-                    // Serial.println("2-> true");
                     break;
                 }
             }
@@ -591,7 +581,6 @@ void body_dance(int i) {
     set_site(1, x_default, y_default, KEEP);
     set_site(2, x_default, y_default, KEEP);
     set_site(3, x_default, y_default, KEEP);
-    Serial.println("mark");
     print_reach = true;
     wait_all_reach();
     stand();
@@ -641,12 +630,13 @@ void action_cmd (void) {
 #endif
 
 void servos_cmd(int action_mode, int n_step) {
-    Serial.println("Action:");
-    Demo_mode = false;
 
     switch (action_mode) {
         case W_FORWARD:
             Serial.println("Step forward");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("forward");
+#endif
             lastComm = "FWD";
             if (!is_stand())
                 stand();
@@ -655,6 +645,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_BACKWARD:
             Serial.println("Step back");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("backward");
+#endif
             lastComm = "BWD";
             if (!is_stand())
                 stand();
@@ -663,6 +656,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_LEFT:
             Serial.println("Turn left");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("turn left");
+#endif
             lastComm = "LFT";
             if (!is_stand())
                 stand();
@@ -671,6 +667,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_RIGHT:
             Serial.println("Turn right");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("turn right");
+#endif
             lastComm = "RGT";
             if (!is_stand())
                 stand();
@@ -679,6 +678,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_STAND_SIT:
             Serial.println("1:up,0:dn");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("stand sit");
+#endif
             lastComm = "";
             if (n_step)
                 stand();
@@ -688,25 +690,37 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_SHAKE:
             Serial.println("Hand shake");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("hand shake");
+#endif
             lastComm = "";
             hand_shake(n_step);
             break;
 
         case W_WAVE:
             Serial.println("Hand wave");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("hand wave");
+#endif
             lastComm = "";
             hand_wave(n_step);
             break;
 
         case W_DANCE:
             Serial.println("Lets rock baby");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("dance");
+#endif
             lastComm = "";
             //body_dance(n_step);
             body_dance(10);
             break;
 
         case W_SET:
-            Serial.println("Higher");
+            Serial.println("Reset");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("reset");
+#endif
             sst.FLElbow = 0;
             sst.FRElbow = 0;
             sst.RLElbow = 0;
@@ -724,6 +738,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_HIGHER:
             Serial.println("Higher");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("higher");
+#endif
             sst.FLElbow -= 4;
             sst.FRElbow -= 4;
             sst.RLElbow -= 4;
@@ -737,6 +754,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_LOWER:
             Serial.println("Lower");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("lower");
+#endif
             sst.FLElbow += 4;
             sst.FRElbow += 4;
             sst.RLElbow += 4;
@@ -750,6 +770,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_HEAD_UP:
             Serial.println("Head up");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("head up");
+#endif
             sst.FLElbow -= 4;
             sst.FRElbow -= 4;
             sst.RLElbow += 4;
@@ -763,6 +786,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_HEAD_DOWN:
             Serial.println("Head down");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("head down");
+#endif
             sst.FLElbow += 4;
             sst.FRElbow += 4;
             sst.RLElbow -= 4;
@@ -776,6 +802,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_B_RIGHT:
             Serial.println("body right");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("body right");
+#endif
             if (!is_stand()) stand();
             sst.FLElbow -= 4;
             sst.FRElbow += 4;
@@ -790,6 +819,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_B_LEFT:
             Serial.println("body left");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("body left");
+#endif
             if (!is_stand()) stand();
             sst.FLElbow += 4;
             sst.FRElbow -= 4;
@@ -804,6 +836,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_B_INIT:
             Serial.println("Body init");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("body init");
+#endif
             lastComm = "";
             sit();
             b_init();
@@ -824,6 +859,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_TW_R:
             Serial.println("Body twist right");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("twist right");
+#endif
             sst.FLShdr -= 4;
             sst.FRShdr += 4;
             sst.RLShdr += 4;
@@ -833,6 +871,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         case W_TW_L:
             Serial.println("Body twist left");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("twist left");
+#endif
             sst.FLShdr += 4;
             sst.FRShdr -= 4;
             sst.RLShdr -= 4;
@@ -842,6 +883,9 @@ void servos_cmd(int action_mode, int n_step) {
 
         default:
             Serial.println("Error");
+#ifdef ENABLE_BLUETOOTH
+            btSerial.println("error");
+#endif
             break;
     }
 }
@@ -935,7 +979,7 @@ void servos_service(void * data) {
         }
         sst.rest_counter++;
         xSemaphoreGive(Semaphore);
-        vTaskDelay(20 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
         
 #ifdef TIMER_INTERRUPT_DEBUG
         Serial.printf("%05lu counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
@@ -1007,12 +1051,33 @@ void servos_init() {
     btSerial.begin("QuadPod");
     Serial.println("BT Serial ready");
 #endif
-
     Serial.println("Robot initialization Complete");
 }
 
+uint32_t ledPulse = 0;
+uint32_t ledSpeed = LED_SPEED;
+
 void servos_loop() {
+
+    //-----------led blink status
+    if (ledPulse <= ledSpeed) {
+        digitalWrite(LED_BUILTIN, HIGH);
+    }
+    if (ledPulse > ledSpeed*3) {
+        digitalWrite(LED_BUILTIN, LOW);
+    }
+    if (ledPulse >= ledSpeed*4) {
+        ledPulse = 0;
+#ifdef ENABLE_BLUETOOTH
+        if (btSerial.hasClient()) ledSpeed = LED_SPEED*3;
+        else ledSpeed = LED_SPEED;
+#endif
+    }
+
+    ledPulse++;
+
     commRead();
+
     if (getLastComm() == "FWD") {
         step_forward(1);
     }
@@ -1029,6 +1094,6 @@ void servos_loop() {
 #ifdef TIMER_INTERRUPT_DEBUG
     Serial.printf("%05lu loop counter: %lu\n",(unsigned long)millis(),(unsigned long)sst.rest_counter);
 #endif
-    // Serial.printf("[%05lu] last cmd ==> %s\n",(unsigned long)millis(),getLastComm());
+
 }
 

@@ -14,9 +14,6 @@
 
 #include <Arduino.h>
 #include <servos.hpp>
-#define LED_BUILTIN 22
-
-int ledPulse = 0;
 
 void setup() {
     //start serial for debug
@@ -28,24 +25,10 @@ void setup() {
     Serial.println("===== SETUP END =====");
 }
 
-uint16_t action;
+// uint16_t action;
 
 void loop() {
-    //-----------led blink status
-    if (ledPulse <= 500) {
-        digitalWrite(LED_BUILTIN, HIGH);
-    }
-    if (ledPulse > 1500) {
-        digitalWrite(LED_BUILTIN, LOW);
-    }
-    if (ledPulse >= 2000) {
-        ledPulse = 0;
-    }
-
-    ledPulse++;
-
     servos_loop();
-
     // if(action++==30) {
     //     Serial.println("Forward");
     //     servos_cmd(1,2);
