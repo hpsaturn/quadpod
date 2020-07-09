@@ -25,12 +25,6 @@ void setup() {
     Serial.println("===== SETUP END =====");
 }
 
-// uint16_t action;
-
 void loop() {
     servos_loop();
-    // if(action++==30) {
-    //     Serial.println("Forward");
-    //     servos_cmd(1,2);
-    // }
 }
