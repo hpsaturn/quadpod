@@ -44,6 +44,10 @@ cd quadpod && pio pio run --target upload
 For now, you can use this app: [Serial Bluetooth Terminal](https://play.google.com/store/apps/details?id=de.kai_morich.serial_bluetooth_terminal) and donwload the file `serial_bluetooth_terminal.cfg.txt` that is under `bt` folder of this project, then send it to your phone and import it with this application for get all commands and buttons for controlling the robot.
 
 
+# Credits
+
+Special thanks to [Santiago Vanegas](https://www.thingiverse.com/alfazoom/designs) for 3D models and many improvements.
+
 ---
 
 ### Donations:
