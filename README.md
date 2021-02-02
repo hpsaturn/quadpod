@@ -11,8 +11,7 @@ The robot is useful for understand many things, and is funny making it, but the 
 
 # Electric diagram
 
-<a href="" target="_blank"><img src="images/electric_diagram.jpg"></a>
-
+<img src="images/electric_diagram.jpg">
 
 # Build and Flashing
 
@@ -63,4 +62,4 @@ CanAir.IO Citizen network for monitoring air quality https://canair.io
 
 ---
 
-<a href="" target="_blank"><img src="images/collage00.jpg"></a>
+<img src="images/collage00.jpg">
