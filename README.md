@@ -1,14 +1,21 @@
 # Quadpod ESP32 Bluetooth Alternative
 
-One year ago, in the middle of Covid19, with my brother we did this robot alternative, it is a remix of a popular SG90 12DOF robot in [Thingiverse](https://www.thingiverse.com/thing:3122758), My brother did again some 3d print parts and I did the migration from two Arduino micro controllers to a only ESP32 micro controller using FreeRTOS tasks. Also the robot using a Bluetooth connection for improve usability and power consumption, but is possible controlling it with WiFI connection. 
+One year ago, in the middle of Covid19, with my [brother](https://www.youtube.com/user/svporion/featured) we did this robot alternative, it is a remix of a popular SG90 12DOF robot in [Thingiverse](https://www.thingiverse.com/thing:3122758), My brother did again some 3d print parts and I did the migration from two Arduino micro controllers to a only ESP32 micro controller using FreeRTOS tasks. Also the robot using a Bluetooth connection for improve usability and power consumption, but is possible controlling it with WiFI connection. 
 
 <a href="https://youtu.be/UDZQokIno-8" target="_blank"><img src="images/thumbnail_video.jpg"></a>
 
-## Build and Flashing
+
+# NOTE:
+
+The robot is useful for understand many things, and is funny making it, but the speed and performance it is little bit buggy, we recommended using **MG90S** servos instead SG90 plastic servo, or maybe using better servos, also the hexapod config will be better, but again, for learning it model is fine.
+
+
+
+# Build and Flashing
 
 First of all, install PlatformIO with your favourite IDE (i.e. VSCode). Follow [this](https://platformio.org/platformio-ide) instructions. Also, you may need to install [git](http://git-scm.com/) in your system.
 
-Clone the repo
+## Clone the repo
 
 ```sh
 git clone https://github.com/hpsaturn/quadpod.git
