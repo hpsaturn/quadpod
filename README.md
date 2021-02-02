@@ -7,8 +7,11 @@ One year ago, in the middle of Covid19, with my [brother](https://www.youtube.co
 
 # NOTE:
 
-The robot is useful for understand many things, and is funny making it, but the speed and performance it is little bit buggy, we recommended using **MG90S** servos instead SG90 plastic servo, or maybe using better servos, also the hexapod config will be better, but again, for learning it model is fine.
+The robot is useful for understand many things, and is funny making it, but the speed and performance is a little bit buggy, we recommended using **MG90S** servos instead SG90 plastic servo, or maybe using better servos, also the hexapod config will be better, but again, for learning it model is fine.
 
+# Electric diagram
+
+<a href="" target="_blank"><img src="images/electric_diagram.jpg"></a>
 
 
 # Build and Flashing
@@ -35,6 +38,25 @@ cd quadpod && pio pio run --target upload
 
 # Bluetooth control
 
-<img align="right" width="120" src="images/bt_serial_control.jpg">
+<img align="right" width="90" src="images/bt_serial_control.jpg">
+
 
 For now, you can use this app: [Serial Bluetooth Terminal](https://play.google.com/store/apps/details?id=de.kai_morich.serial_bluetooth_terminal) and donwload the file `serial_bluetooth_terminal.cfg.txt` that is under `bt` folder of this project, then send it to your phone and import it with this application for get all commands and buttons for controlling the robot.
+
+
+---
+
+### Donations:
+
+If you want invite me a coffee in:  
+
+https://hpsaturn.com/about/  
+https://paypal.me/hpsaturn
+
+### Or support my initiative
+
+CanAir.IO Citizen network for monitoring air quality https://canair.io
+
+---
+
+<a href="" target="_blank"><img src="images/collage00.jpg"></a>
