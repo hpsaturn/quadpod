@@ -1,6 +1,8 @@
 # Quadpod ESP32 Bluetooth Alternative
 
-Quadruped robot, spider form factor, improved with a ESP32 and a Bluetooth connection for improve usability and power consumption. Also the original timer library was migrated to a RTOS  task on the dual core of the ESP32 for improve and reducing the electronic, because the original project was using two microcontrollers, now you only need one. 
+One year ago, in the middle of Covid19, with my brother we did this robot alternative, it is a remix of a popular SG90 12DOF robot in [Thingiverse](https://www.thingiverse.com/thing:3122758), My brother did again some 3d print parts and I did the migration from two Arduino micro controllers to a only ESP32 micro controller using FreeRTOS tasks. Also the robot using a Bluetooth connection for improve usability and power consumption, but is possible controlling it with WiFI connection. 
+
+<a href="https://youtu.be/UDZQokIno-8" target="_blank"><img src="images/thumbnail_video.jpg"></a>
 
 ## Build and Flashing
 
