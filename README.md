@@ -32,7 +32,7 @@ Open cloned folder with your PlatformIO IDE and build & upload it. For details p
 Or after clone also you can build and upload the current firmware from CLI:
 
 ```shell
-cd quadpod && pio pio run --target upload
+cd quadpod && pio run --target upload
 ```
 
 # Bluetooth control
