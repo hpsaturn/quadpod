@@ -8,6 +8,11 @@ One year ago, in the middle of Covid19, with my [brother](https://www.youtube.co
 
 The robot is useful for understand many things, and is funny making it, but the speed and performance is a little bit buggy, we recommended using **MG90S** servos instead SG90 plastic servo, or maybe using better servos, also the hexapod config will be better, but again, for learning this model is fine.
 
+# 3D Print
+
+The last improved parts are here in this repository, but you also to able some details and photos of this models in the our [Thingiverse](https://www.thingiverse.com/thing:4644707) page.
+
+
 # Electric diagram
 
 <img src="images/electric_diagram.jpg">
