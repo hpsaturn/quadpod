@@ -2,7 +2,7 @@
 
 #ifdef ENABLE_BLUETOOTH
 BluetoothSerial btSerial; //Object for Bluetooth
-SerialCommand SCmd = SerialCommand(btSerial) ;  // The demo SerialCommand object
+SerialCommand SCmd(btSerial);  // The demo SerialCommand object
 #endif
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
