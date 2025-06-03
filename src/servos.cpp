@@ -1,8 +1,8 @@
 #include <servos.hpp>
 
 #ifdef ENABLE_BLUETOOTH
-SerialCommand SCmd;  // The demo SerialCommand object
 BluetoothSerial btSerial; //Object for Bluetooth
+SerialCommand SCmd = SerialCommand(btSerial) ;  // The demo SerialCommand object
 #endif
 
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
@@ -994,7 +994,7 @@ String getLastComm() {
 
 void commRead() {
 #ifdef ENABLE_BLUETOOTH
-    SCmd.readSerial(btSerial);
+    SCmd.readSerial();
 #endif
 }
 
