@@ -7,7 +7,6 @@
 
 #define SDA_PIN 16
 #define SCL_PIN 4
-#define LED_BUILTIN 22
 #define LED_SPEED 500
 
 #define W_STAND_SIT    0
